@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=7;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=8;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -354,9 +354,10 @@ const SHOP=[
   {id:'wellness',e:'🧖',n:'Wellness nap',p:2000,req:14},
 ];
 const CUSTOM_BASE=600,CUSTOM_STEP=1.2;
-const nextCustomPrice=()=>Math.round(CUSTOM_BASE*Math.pow(CUSTOM_STEP,S.customCount)/10)*10;
+const customPriceAt=i=>Math.round(CUSTOM_BASE*Math.pow(CUSTOM_STEP,i)/10)*10;
+const nextCustomPrice=()=>customPriceAt(S.custom.length);
 const FREEZE={id:'freeze',e:'❄️',n:'Széria-fagyasztó',p:200,special:1};
-const allShop=()=>[FREEZE,...SHOP,...S.custom.map(c=>({...c,custom:1}))];
+const allShop=()=>[FREEZE,...SHOP,...S.custom.map((c,i)=>({...c,p:customPriceAt(i),custom:1}))];
 const canBuy=i=>i.special?S.coins>=i.p&&S.freezes<3:!!S.goalDays[today()]&&S.coins>=i.p&&(S.best>=(i.req||0));
 function renderShop(){
   $('#coins2').textContent=S.coins;
@@ -440,7 +441,7 @@ $('#wardrobe').onclick=async e=>{
   save();render();
 };
 $('#chestBtn').onclick=openChest;
-$('#cAdd').onclick=()=>{const n=$('#cName').value.trim();if(!n)return;const p=nextCustomPrice();S.customCount++;
+$('#cAdd').onclick=()=>{const n=$('#cName').value.trim();if(!n)return;const p=nextCustomPrice();
   S.custom.push({id:'c'+Date.now(),e:'🎁',n,p});$('#cName').value='';save();render();toast('Jutalom hozzáadva: '+p+' arany')};
 
 /* ---- UI ---- */
