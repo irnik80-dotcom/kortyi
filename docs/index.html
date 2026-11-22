@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=11;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=12;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -247,6 +247,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
 
 <script>
 'use strict';
+const $=s=>document.querySelector(s); /* globális: a régi, mögötte futó szkript ettől hibára fut és nem indul el */
 if(!window.__kortyiRunning){window.__kortyiRunning=1;{
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const KEY='cseppi.v1';
@@ -886,6 +887,9 @@ setTimeout(()=>checkUpdate(false),4000);
 setTimeout(loadRemote,2500);
 resolveMonsters();
 setInterval(()=>{try{render()}catch(e){}},300000);
+/* OTA után a régi oldal maradéka duplikátumként a végére kerülhet: töröljük */
+function dedupe(){const seen=new Set();[...document.body.children].forEach(el=>{const k=el.id?'#'+el.id:el.tagName==='SCRIPT'?'script':'';if(!k)return;if(seen.has(k))el.remove();else seen.add(k)})}
+if(window.__kortyiOta){[0,100,400,1200,3000].forEach(t=>setTimeout(dedupe,t));document.addEventListener('DOMContentLoaded',dedupe);window.addEventListener('load',dedupe)}
 window.KT={get S(){return S},today,logs,sum,save,render,checkUpdate,drink,streak,scheduleReminders,monsterFor,weekKey,addDays,resolveMonsters,checkMonster};
 }}
 </script>
