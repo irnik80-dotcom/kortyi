@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b3d5c">
+<script>
+/* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
+(function(){var V=6;window.APP_V=V;if(window.__kortyiOta)return;
+ try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
+  if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
+  else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
+ }catch(e){}})();
+</script>
+<title>Kortyi – vízivó játék</title>
+<style>
+:root{--bg:#0b3d5c;--bg2:#0e5a85;--card:rgba(255,255,255,.12);--card2:rgba(255,255,255,.2);--txt:#f2fbff;--dim:#b7dcee;--acc:#ffd54a;--water:#38bdf8;--ok:#4ade80}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+html{color-scheme:dark}
+body{font-family:system-ui,-apple-system,Roboto,sans-serif;color:var(--txt);background:linear-gradient(180deg,var(--bg),var(--bg2));overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+main{flex:1;overflow-y:auto;padding:12px 16px 90px;-webkit-overflow-scrolling:touch}
+.view{display:none}.view.on{display:block}
+h2{margin:18px 0 8px;font-size:1.05rem}
+.card{background:var(--card);border-radius:18px;padding:14px;margin-bottom:12px}
+.top{display:flex;align-items:center;gap:10px}
+.lvl{flex:1}
+.lvl b{font-size:1rem}
+.bar{height:10px;border-radius:6px;background:rgba(0,0,0,.25);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#fde047,#f59e0b);border-radius:6px;transition:width .6s}
+.chip{background:var(--card);border-radius:20px;padding:6px 12px;font-weight:700;white-space:nowrap}
+.hero{position:relative;display:flex;justify-content:center;margin:6px 0}
+#hero{width:min(78vw,300px);height:auto;overflow:visible}
+.amount{text-align:center;margin-top:-4px}
+.amount big{font-size:2.2rem;font-weight:800}
+.amount span{color:var(--dim)}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.quick button,.btn{border:0;border-radius:16px;background:var(--card2);color:var(--txt);font-size:.95rem;font-weight:700;padding:12px 4px;cursor:pointer}
+.quick button:active,.btn:active{transform:scale(.95);background:var(--water)}
+.quick button small{display:block;font-weight:400;color:var(--dim);font-size:.7rem}
+.row{display:flex;gap:8px;margin-top:8px}.row .btn{flex:1}
+.btn.pri{background:var(--water);color:#06314a}
+.quest{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.quest:last-child{border:0}
+.quest .q{flex:1}.quest small{color:var(--dim);display:block}
+.quest .xp{font-weight:800;color:var(--acc)}
+.quest.done{opacity:.6}.quest.done .q{text-decoration:line-through}
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.badge{background:var(--card);border-radius:16px;padding:10px 4px;text-align:center;font-size:.75rem}
+.badge .e{font-size:2rem;display:block;filter:grayscale(1) opacity(.35)}
+.badge.got .e{filter:none}
+.badge.got{background:var(--card2)}
+.week{display:flex;align-items:flex-end;gap:8px;height:130px;margin-top:8px}
+.week div{flex:1;text-align:center;font-size:.7rem;color:var(--dim)}
+.week i{display:block;width:100%;border-radius:8px 8px 4px 4px;background:var(--water);min-height:4px}
+.week i.ok{background:var(--ok)}
+.log{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:.9rem}
+label.f{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0}
+input,select{background:rgba(0,0,0,.25);color:var(--txt);border:0;border-radius:10px;padding:8px 10px;font-size:1rem;width:110px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#082c44;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 16px rgba(0,0,0,.3)}
+nav button{flex:1;background:none;border:0;color:var(--dim);padding:10px 0 8px;font-size:.7rem}
+nav button span{display:block;font-size:1.4rem}
+nav button.on{color:var(--acc)}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-150%);background:var(--acc);color:#3b2a00;font-weight:800;padding:10px 18px;border-radius:24px;transition:transform .4s;z-index:20;max-width:90vw;text-align:center}
+#toast.show{transform:translate(-50%,0)}
+#coinsBig{text-align:center;font-size:1.6rem;font-weight:800;margin:6px 0 12px}
+.item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.item:last-child{border:0}
+.item .e{font-size:2rem}.item .n{flex:1;font-weight:700}.item small{display:block;color:var(--dim);font-weight:400}
+.item button{border:0;border-radius:14px;padding:9px 12px;font-weight:800;background:var(--acc);color:#3b2a00}
+.item button:disabled{background:rgba(255,255,255,.15);color:var(--dim)}
+.item button.use{background:var(--ok);color:#052e16}
+.item .del{background:none;color:var(--dim);padding:4px 8px}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:40;padding:20px}
+#dlg.on{display:flex}
+#dlg .box{background:#0e5a85;border-radius:20px;padding:20px;width:100%;max-width:340px}
+#dlg p{white-space:pre-line;margin:0 0 12px;font-size:1.05rem;font-weight:700}
+#dlg input{width:100%;margin-bottom:12px}
+#hero.dry{filter:grayscale(.55) brightness(.85)}
+#hero.dance{animation:dance 1s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes dance{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg) translateY(-8px)}}
+#chestCard{display:none;text-align:center;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;font-weight:800}
+#chestCard.on{display:block}
+#chestCard button{margin-top:8px;border:0;border-radius:14px;background:#fff;color:#9a3412;font-weight:800;padding:10px 18px;font-size:1rem}
+.sw{width:30px;height:30px;border-radius:50%;display:inline-block;vertical-align:middle}
+#cpn{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:45;padding:16px}
+#cpn.on{display:flex}
+#cpn .box{background:#082c44;border-radius:20px;padding:14px;width:100%;max-width:420px}
+#cpn img{width:100%;border-radius:12px;display:block;margin-bottom:12px}
+#types{display:flex;gap:6px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+#types button{flex:0 0 auto;border:0;border-radius:18px;background:var(--card);color:var(--txt);padding:7px 11px;font-size:.85rem;font-weight:700}
+#types button.on{background:var(--water);color:#06314a}
+#typeHint{font-size:.75rem;color:var(--dim);text-align:center;margin-top:6px;min-height:1.1em}
+canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
+.wave1{animation:w 4s linear infinite}.wave2{animation:w 6s linear infinite reverse}
+@keyframes w{to{transform:translateX(-120px)}}
+.float{animation:fl 3s ease-in-out infinite}
+@keyframes fl{50%{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+<div id="app">
+<main>
+<!-- FŐOLDAL -->
+<section class="view on" id="v-home">
+  <div class="top">
+    <div class="lvl"><b id="lvlName"></b><div class="bar"><i id="xpBar"></i></div><small id="xpTxt" style="color:var(--dim)"></small></div>
+    <div class="chip">🔥 <span id="streak">0</span></div>
+    <div class="chip">🪙 <span id="coins">0</span></div>
+  </div>
+  <div class="hero">
+    <svg id="hero" viewBox="0 0 200 250">
+      <defs>
+        <clipPath id="clip"><path d="M100 10 C100 10 20 100 20 160 a80 80 0 0 0 160 0 C180 100 100 10 100 10Z"/></clipPath>
+        <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0284c7"/></linearGradient>
+      </defs>
+      <path d="M100 10 C100 10 20 100 20 160 a80 80 0 0 0 160 0 C180 100 100 10 100 10Z" fill="rgba(255,255,255,.12)"/>
+      <g clip-path="url(#clip)">
+        <g id="water" style="transition:transform 1s cubic-bezier(.2,.8,.2,1)" transform="translate(0,250)">
+          <g class="wave2" opacity=".5"><path d="M-120 0 q30-14 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 V260 H-120Z" fill="#bae6fd"/></g>
+          <g class="wave1"><path d="M-120 4 q30-14 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 V260 H-120Z" fill="url(#wg)"/></g>
+        </g>
+      </g>
+      <path d="M100 10 C100 10 20 100 20 160 a80 80 0 0 0 160 0 C180 100 100 10 100 10Z" fill="none" stroke="#e0f7ff" stroke-width="4"/>
+      <g id="face" class="float"></g>
+    </svg>
+  </div>
+  <div class="amount"><big><span id="cur" style="color:var(--txt)">0</span> <span>/ <span id="goal">2000</span> ml</big></span><br><span id="mood"></span></div>
+  <div id="types"></div><div id="typeHint"></div>
+  <div class="quick" id="quick"></div>
+  <div class="row"><button class="btn" id="custom">✏️ Egyedi</button><button class="btn" id="undo">↩️ Visszavon</button></div>
+  <div class="card" id="chestCard"><div id="chestTxt">🎁 Meglepetés láda vár!</div><button id="chestBtn">Kinyitom</button></div>
+  <div class="card" id="weekly"></div>
+  <h2>🎯 Napi küldetések</h2>
+  <div class="card" id="quests"></div>
+  <h2>🕒 Mai napló</h2>
+  <div class="card" id="todayLog"></div>
+</section>
+<!-- BOLT -->
+<section class="view" id="v-shop">
+  <div id="coinsBig">🪙 <span id="coins2">0</span> érme</div>
+  <div class="card" id="shopInfo" style="font-size:.9rem"></div>
+  <h2>🎁 Jutalmak</h2><div class="card" id="shop"></div>
+  <h2 id="wardH">🎨 Kabala szekrény</h2><div class="card" id="wardrobe"></div>
+  <h2>🎟️ Megvásárolt jutalmaim</h2><div class="card" id="owned"></div>
+  <h2>➕ Saját jutalom</h2>
+  <div class="card">
+    <label class="f">Név<input id="cName" placeholder="pl. Mozi" style="width:170px"></label>
+    <div id="cPriceInfo" style="margin:8px 0;color:var(--dim);font-size:.9rem"></div>
+    <div class="row"><button class="btn pri" id="cAdd">Hozzáadás</button></div>
+  </div>
+</section>
+<!-- JELVÉNYEK -->
+<section class="view" id="v-badges">
+  <h2>🏅 Jelvények</h2><div class="badges" id="badges"></div>
+  <h2>📊 Statisztika</h2><div class="card" id="stats"></div>
+</section>
+<!-- HETI -->
+<section class="view" id="v-week">
+  <h2>📈 Elmúlt 7 nap</h2><div class="card"><div class="week" id="week"></div></div>
+  <div class="card" id="weekTxt"></div>
+</section>
+<!-- BEÁLLÍTÁS -->
+<section class="view" id="v-set">
+  <h2>⚙️ Beállítások</h2>
+  <div class="card">
+    <label class="f">Napi cél (ml)<input type="number" id="sGoal" min="500" max="6000" step="50"></label>
+    <label class="f">Emlékeztetők<select id="sRem"><option value="0">Ki</option><option value="1">1 óránként</option><option value="2">2 óránként</option><option value="3">3 óránként</option></select></label>
+    <label class="f">Játékos neve<input id="sPlayer" style="width:150px"></label>
+    <label class="f">Ébredés (óra)<input type="number" id="sFrom" min="0" max="23"></label>
+    <label class="f">Lefekvés (óra)<input type="number" id="sTo" min="1" max="23"></label>
+    <div class="row"><button class="btn pri" id="sSave">Mentés</button></div>
+  </div>
+  <div class="card"><div class="row" style="margin:0;align-items:center"><span id="ver" style="flex:1;color:var(--dim)"></span><button class="btn" id="chk" style="flex:0 0 auto;padding:10px 14px">🔄 Frissítés keresése</button></div></div>
+  <div class="card"><button class="btn" id="reset" style="width:100%;background:#7f1d1d">Összes adat törlése</button></div>
+  <p style="color:var(--dim);font-size:.8rem;text-align:center">Az emlékeztetők a legközelebbi megnyitáskor frissülnek 7 napra előre. Tipp: kb. 30–35 ml / testsúlykilogramm a napi ajánlás.</p>
+</section>
+</main>
+<nav>
+  <button class="on" data-v="home"><span>💧</span>Játék</button>
+  <button data-v="shop"><span>🛍️</span>Bolt</button>
+  <button data-v="badges"><span>🏅</span>Jelvények</button>
+  <button data-v="week"><span>📈</span>Heti</button>
+  <button data-v="set"><span>⚙️</span>Beállítás</button>
+</nav>
+</div>
+<div id="dlg"><div class="box"><p id="dMsg"></p><input id="dIn" type="text" hidden><div class="row"><button class="btn" id="dNo">Mégse</button><button class="btn pri" id="dYes">OK</button></div></div></div>
+<div id="cpn"><div class="box"><img id="cpnImg" alt="Kupon"><div class="row"><button class="btn" id="cpnClose">Bezár</button><button class="btn pri" id="cpnShare">📤 Küldés</button></div></div></div>
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+if(!window.__kortyiRunning){window.__kortyiRunning=1;{
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const KEY='cseppi.v1';
+const NAMES=['Pocsolya','Csepp','Patakocska','Forrás','Tó','Folyó','Vízesés','Óceán','Víz Mestere','Tenger Királya'];
+const QUICK=[150,250,330,500];
+
+const today=()=>dkey(new Date());
+function dkey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function addDays(k,n){const [y,m,d]=k.split('-').map(Number);return dkey(new Date(y,m-1,d+n))}
+
+let S=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
+  return {}}
+function fix(){const D={goal:2000,xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0};
+  for(const k in D)if(S[k]===undefined)S[k]=D[k]}
+fix();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+const logs=(k=today())=>S.days[k]||[];
+const sum=(k=today())=>logs(k).reduce((a,l)=>a+l.ml,0);
+const level=xp=>Math.floor((1+Math.sqrt(1+xp/12.5))/2);
+const needFor=L=>50*L*(L-1);
+
+function streak(){ // egymás utáni napok, amikor a cél teljesült
+  let k=today(),n=0;
+  if(!S.goalDays[k])k=addDays(k,-1);
+  while(S.goalDays[k]||S.frozen[k]){if(S.goalDays[k])n++;k=addDays(k,-1)}
+  return n;
+}
+function applyFreezes(){ // kihagyott napokat fagyasztóval menti meg, de csak ha előtte széria volt
+  const keys=Object.keys(S.goalDays).sort();if(!keys.length)return;
+  const y=addDays(today(),-1),last=keys[keys.length-1];let used=0;
+  for(let k=addDays(S.fzDone&&S.fzDone>last?S.fzDone:last,1);k<=y;k=addDays(k,1)){
+    if(S.goalDays[k]||S.frozen[k])continue;
+    const pv=addDays(k,-1);
+    if((S.goalDays[pv]||S.frozen[pv])&&S.freezes>0){S.frozen[k]=1;S.freezes--;used++}
+  }
+  S.fzDone=y;save();
+  if(used)setTimeout(()=>toast('❄️ A széria-fagyasztó megmentette a szériád!'),700);
+}
+
+/* ---- Küldetések ---- */
+const QUESTS=[
+  {id:'a',t:'Igyál 500 ml-t 12 óra előtt',xp:30,ok:d=>d.filter(l=>l.h<12).reduce((a,l)=>a+l.ml,0)>=500,prog:d=>Math.min(500,d.filter(l=>l.h<12).reduce((a,l)=>a+l.ml,0))+'/500'},
+  {id:'b',t:'Igyál legalább 6 alkalommal',xp:25,ok:d=>d.length>=6,prog:d=>Math.min(6,d.length)+'/6'},
+  {id:'c',t:'Érd el a napi célod 20:00 előtt',xp:40,ok:()=>S.goalDays[today()]&&S.goalDays[today()]<20,prog:()=>S.goalDays[today()]?'kész':'folyamatban'},
+  {id:'d',t:'Igyál 3 különböző órában',xp:20,ok:d=>new Set(d.map(l=>l.h)).size>=3,prog:d=>Math.min(3,new Set(d.map(l=>l.h)).size)+'/3'},
+  {id:'e',t:'Igyál 1000 ml-t délután 3 előtt',xp:35,ok:d=>d.filter(l=>l.h<15).reduce((a,l)=>a+l.ml,0)>=1000,prog:d=>Math.min(1000,d.filter(l=>l.h<15).reduce((a,l)=>a+l.ml,0))+'/1000'},
+];
+function todaysQuests(){ // naponta 3 determinisztikus küldetés
+  const seed=[...today()].reduce((a,c)=>a+c.charCodeAt(0),0);
+  const idx=[...QUESTS.keys()];const pick=[];
+  for(let i=0;i<3;i++){pick.push(idx.splice((seed*(i+3))%idx.length,1)[0])}
+  return pick.map(i=>QUESTS[i]);
+}
+
+/* ---- Jelvények ---- */
+const total=()=>Object.values(S.days).flat().reduce((a,l)=>a+l.ml,0);
+const BADGES=[
+  {id:'first',e:'🥤',n:'Első korty',d:'Rögzíts egy italt',ok:()=>total()>0},
+  {id:'goal',e:'🎯',n:'Célba ért',d:'Teljesítsd a napi célt',ok:()=>Object.keys(S.goalDays).length>0},
+  {id:'s3',e:'🔥',n:'3 napos széria',d:'3 nap egymás után',ok:()=>streak()>=3},
+  {id:'s7',e:'🌋',n:'Heti hős',d:'7 napos széria',ok:()=>streak()>=7},
+  {id:'s30',e:'🏔️',n:'Havi legenda',d:'30 napos széria',ok:()=>streak()>=30},
+  {id:'early',e:'🐦',n:'Hajnali madár',d:'Igyál 7 óra előtt',ok:()=>Object.values(S.days).flat().some(l=>l.h<7)},
+  {id:'big',e:'🐳',n:'Nagy hörpintés',d:'Egyszerre 500+ ml',ok:()=>Object.values(S.days).flat().some(l=>l.ml>=500)},
+  {id:'over',e:'🚀',n:'Túlteljesítő',d:'A cél 150%-a egy nap',ok:()=>sum()>=S.goal*1.5},
+  {id:'l10',e:'🪣',n:'10 liter',d:'Összesen 10 l',ok:()=>total()>=10000},
+  {id:'l100',e:'🛁',n:'100 liter',d:'Összesen 100 l',ok:()=>total()>=100000},
+  {id:'lv5',e:'⭐',n:'5. szint',d:'Érj el 5. szintet',ok:()=>level(S.xp)>=5},
+  {id:'lv10',e:'👑',n:'10. szint',d:'Érj el 10. szintet',ok:()=>level(S.xp)>=10},
+];
+
+/* ---- Saját párbeszédablak (confirm/prompt helyett) ---- */
+function ask(msg,o={}){return new Promise(res=>{
+  const d=$('#dlg'),i=$('#dIn');$('#dMsg').textContent=msg;i.hidden=!o.input;$('#dNo').hidden=!!o.ok;i.value=o.def||'';if(o.input)i.type=o.type||'text';
+  d.classList.add('on');if(o.input)setTimeout(()=>i.focus(),50);
+  const end=v=>{d.classList.remove('on');$('#dYes').onclick=$('#dNo').onclick=null;res(v)};
+  $('#dYes').onclick=()=>end(o.input?i.value:true);$('#dNo').onclick=()=>end(o.input?null:false);
+})}
+const info=m=>ask(m,{ok:1});
+/* ---- Művelet ---- */
+function addXp(n,why){
+  const before=level(S.xp);S.xp+=n;const after=level(S.xp);
+  if(after>before){toast('⬆️ Szintlépés! '+levelName(after));confetti(120);S.coins+=5*(after-before)}
+  else if(why)toast('+'+n+' XP '+why);
+}
+const levelName=L=>'Sz.'+L+' · '+NAMES[Math.min(NAMES.length-1,Math.floor((L-1)/1.5))];
+
+const COOLDOWN=20*60000,DRINK_CAP=15,GOAL_COINS=15,WEEK_NEED=5,WEEK_COINS=60;
+function weekKey(k){const [y,m,d]=k.split('-').map(Number);const dt=new Date(y,m-1,d);return dkey(new Date(y,m-1,d-((dt.getDay()+6)%7)))}
+const weekDone=()=>{const w=weekKey(today());return Object.keys(S.goalDays).filter(k=>weekKey(k)===w).length};
+const TYPES={viz:{e:'💧',n:'Víz',f:1,water:1},tea:{e:'🍵',n:'Tea',f:.95,water:1},shake:{e:'💪',n:'Shake (vízzel)',f:.95,water:1},kave:{e:'☕',n:'Kávé',f:.9,water:1},kakao:{e:'🥛',n:'Kakaó / tej',f:.5},shakeT:{e:'🥤',n:'Shake (tejjel)',f:.5},udito:{e:'🧃',n:'Üdítő',f:.3}};
+let curType='viz';
+function drink(raw,type=curType){
+  if(!(raw>0)||raw>1000){toast('Egyszerre legfeljebb 1000 ml');return}
+  const T=TYPES[type]||TYPES.viz,ml=Math.round(raw*T.f);
+  const now=new Date(),k=today(),arr=(S.days[k]=S.days[k]||[]);
+  const lastQ=[...arr].reverse().find(l=>l.q);
+  const q=!lastQ||now.getTime()-lastQ.t>=COOLDOWN;
+  const before=sum();
+  const e={ml,raw,type,t:now.getTime(),h:now.getHours(),q:q?1:0,c:0,x:0};
+  if(q){const credited=Math.max(0,Math.min(ml,S.goal-before));e.c=Math.round(DRINK_CAP*credited/S.goal);e.x=Math.round(ml/10)}
+  arr.push(e);S.coins+=e.c;
+  if(q)addXp(e.x);
+  if(!q)toast(T.e+' Naplózva. Érme és XP 20 percenként jár.');else if(!T.water)toast(T.e+' '+raw+' ml '+T.n.toLowerCase()+' = '+ml+' ml vízként számít');
+  if(q){const t=S.tod[k]=S.tod[k]||{},h=now.getHours();
+    if(h<10&&!t.m){t.m=1;addXp(10,'– reggeli pohár ☀️')}
+    if(h>=S.to-1&&!t.e){t.e=1;addXp(10,'– esti pohár 🌙')}}
+  checkGoal(now);checkQuests();checkBadges();save();render();rescheduleSoon();
+}
+function checkGoal(now){
+  const k=today();
+  if(S.goalDays[k]||sum()<S.goal||logs().filter(l=>l.q).length<3)return;
+  S.goalDays[k]=now.getHours();
+  const st=streak();S.best=Math.max(S.best,st);
+  if(!S.goalPaid[k]){S.goalPaid[k]=1;addXp(50+Math.min(st,10)*5);S.coins+=GOAL_COINS}
+  S.chest=k;
+  toast('🎉 Napi cél teljesítve! Széria: '+st+' nap');confetti(220);
+  const w=weekKey(k);
+  if(weekDone()>=WEEK_NEED&&!S.weekly[w]){S.weekly[w]=1;S.coins+=WEEK_COINS;setTimeout(()=>{toast('🏆 Heti kihívás kész! +'+WEEK_COINS+' érme');confetti(200)},2800)}
+}
+function checkQuests(){
+  const d=logs();S.claimed[today()]=S.claimed[today()]||{};
+  for(const q of todaysQuests()){
+    if(!S.claimed[today()][q.id]&&q.ok(d)){S.claimed[today()][q.id]=1;S.coins+=3;addXp(q.xp,'– '+q.t)}
+  }
+}
+function checkBadges(){
+  for(const b of BADGES)if(!S.badges[b.id]&&b.ok()){S.badges[b.id]=today();setTimeout(()=>{toast(b.e+' Új jelvény: '+b.n);confetti(80)},900)}
+}
+
+/* ---- Meglepetés láda ---- */
+const rn=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const CHEER=['Büszke vagyok rád, a veséid is táncolnak! 🕺','A bőröd már most hálás! ✨','Ennyi víztől még a kaktusz is megirigyelne 🌵','Szép munka, vízi hős! 🌊'];
+async function openChest(){
+  if(S.chest!==today())return;S.chest='';
+  const r=Math.random()*100;let msg;
+  if(r<50){const c=rn(3,6);S.coins+=c;msg='+'+c+' érme 🪙'}
+  else if(r<80){const c=rn(7,12);S.coins+=c;msg='+'+c+' érme 🪙🪙'}
+  else if(r<92){const c=rn(15,25);S.coins+=c;msg='Főnyeremény: +'+c+' érme! 🪙🪙🪙'}
+  else if(r<97){if(S.freezes<3){S.freezes++;msg='❄️ Széria-fagyasztót találtál!'}else{S.coins+=20;msg='+20 érme 🪙'}}
+  else{addXp(100);msg='+100 XP ⭐'}
+  save();render();confetti(160);
+  await info('🎁 Kinyitottad a ládát: '+msg+'\n'+rnd(CHEER));
+}
+
+/* ---- Bolt ---- */
+const SHOP=[
+  {id:'somloi',e:'🍰',n:'Auchan somlói',p:250},
+  {id:'fagyi',e:'🍦',n:'Fagyizás',p:300},
+  {id:'seta',e:'🚶‍♀️',n:'Séta kettesben',p:400},
+  {id:'ikea',e:'🍪',n:'IKEA sütizés',p:450},
+  {id:'sorozat',e:'📺',n:'Sorozatmaraton, kedvenc snackkel',p:500},
+  {id:'masszazs',e:'💆',n:'Hátmasszázs',p:600},
+  {id:'reggeli',e:'🥞',n:'Ágyba vitt reggeli',p:700},
+  {id:'film',e:'🎬',n:'Mozi + popcorn',p:800},
+  {id:'vacsora',e:'🕯️',n:'Romantikus vacsora',p:1200,req:7},
+  {id:'wellness',e:'🧖',n:'Wellness nap',p:2000,req:14},
+];
+const CUSTOM_BASE=600,CUSTOM_STEP=1.2;
+const nextCustomPrice=()=>Math.round(CUSTOM_BASE*Math.pow(CUSTOM_STEP,S.customCount)/10)*10;
+const FREEZE={id:'freeze',e:'❄️',n:'Széria-fagyasztó',p:200,special:1};
+const allShop=()=>[FREEZE,...SHOP,...S.custom.map(c=>({...c,custom:1}))];
+const canBuy=i=>i.special?S.coins>=i.p&&S.freezes<3:!!S.goalDays[today()]&&S.coins>=i.p&&(S.best>=(i.req||0));
+function renderShop(){
+  $('#coins2').textContent=S.coins;
+  $('#cPriceInfo').innerHTML='Az új jutalom ára: <b style="color:var(--acc)">🪙 '+nextCustomPrice()+'</b><br>Minden újabb saját jutalom 20%-kal drágább az előzőnél.';
+  const wd=Math.min(WEEK_NEED,weekDone());
+  $('#shopInfo').innerHTML=(S.goalDays[today()]?'✅ A mai cél kész, vásárolhatsz.':'🔒 Vásárolni csak a mai cél teljesítése után lehet.')+`<br>🏆 Heti kihívás: <b>${wd}/${WEEK_NEED}</b> nap teljesítve, jutalom: ${WEEK_COINS} érme`;
+  const btn=i=>{const lock=S.best<(i.req||0);
+    if(i.special)return `<button data-buy="${i.id}" ${canBuy(i)?'':'disabled'}>${S.freezes>=3?'Max 3':'Vásárlás'}</button>`;
+    return `<button data-buy="${i.id}" ${canBuy(i)?'':'disabled'}>${lock?'🔒 '+i.req+' napos széria':!S.goalDays[today()]?'Előbb a mai cél':'Vásárlás'}</button>`};
+  $('#shop').innerHTML=allShop().map(i=>`<div class="item"><span class="e">${i.e}</span><div class="n">${i.n}<small>🪙 ${i.p}${i.req?' · nagy jutalom':''}${i.special?' · megmenti a szériát egy kihagyott napon ('+S.freezes+'/3)':''}</small></div>${btn(i)}${i.custom?`<button class="del" data-del="${i.id}">✕</button>`:''}</div>`).join('');
+  $('#owned').innerHTML=S.owned.length?S.owned.map((o,k)=>`<div class="item"><span class="e">${o.e}</span><div class="n">${o.n}<small>${o.used?'Beváltva: '+o.used:'Vásárolva: '+o.date}</small></div><div style="display:flex;gap:6px;flex-direction:column"><button data-cpn="${k}">🎟️ Kupon</button>${o.used?'<span style="color:var(--ok);text-align:center">✔</span>':`<button class="use" data-use="${k}">Beváltva</button>`}</div></div>`).join(''):'<span style="color:var(--dim)">Még nincs jutalmad. Igyál sokat! 💧</span>';
+}
+$('#shop').onclick=async e=>{
+  const d=e.target.closest('[data-del]');if(d){if(await ask('Törlöd ezt a jutalmat?')){S.custom=S.custom.filter(c=>c.id!==d.dataset.del);save();render()}return}
+  const b=e.target.closest('[data-buy]');if(!b)return;
+  const i=allShop().find(x=>x.id===b.dataset.buy);if(!i||!canBuy(i))return;
+  if(!await ask(i.e+' '+i.n+' – '+i.p+' érme. Megveszed?'))return;
+  if(i.special){S.coins-=i.p;S.freezes++;save();render();toast('❄️ Megvetted: széria-fagyasztó');return}
+  S.coins-=i.p;S.owned.unshift({e:i.e,n:i.n,date:today()});save();render();toast('🛍️ Megvetted: '+i.n);confetti(90);
+};
+$('#owned').onclick=async e=>{
+  const c=e.target.closest('[data-cpn]');if(c){showCoupon(S.owned[+c.dataset.cpn],+c.dataset.cpn);return}
+  const b=e.target.closest('[data-use]');if(!b)return;const o=S.owned[+b.dataset.use];
+  if(await ask('Megjelölöd beváltottnak: '+o.n+'?')){o.used=today();save();render();toast('Jó szórakozást! 🎉')}};
+
+/* ---- Kupon ---- */
+let cpnData='',cpnName='';
+function showCoupon(o,idx){
+  const c=document.createElement('canvas');c.width=900;c.height=480;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,900,480);g.addColorStop(0,'#0e7490');g.addColorStop(1,'#0b3d5c');x.fillStyle=g;x.fillRect(0,0,900,480);
+  x.strokeStyle='#ffd54a';x.lineWidth=6;x.setLineDash([22,14]);x.strokeRect(24,24,852,432);x.setLineDash([]);
+  x.fillStyle='rgba(255,255,255,.12)';x.beginPath();x.arc(740,240,190,0,7);x.fill();
+  x.textAlign='center';x.fillStyle='#fff';x.font='150px sans-serif';x.fillText(o.e,740,285);
+  x.textAlign='left';x.fillStyle='#ffd54a';x.font='bold 34px sans-serif';x.fillText('K U P O N',70,95);
+  x.fillStyle='#fff';let fs=64;const nm=o.n;do{x.font='bold '+fs+'px sans-serif';fs-=2}while(x.measureText(nm).width>470&&fs>26);
+  // sortörés két sorra ha kell
+  const words=nm.split(' ');let l1='',l2='';
+  if(x.measureText(nm).width>470){words.forEach(w=>{(x.measureText((l1+' '+w).trim()).width<=470&&!l2)?l1=(l1+' '+w).trim():l2=(l2+' '+w).trim()})}else l1=nm;
+  x.fillText(l1,70,205);if(l2)x.fillText(l2,70,205+fs+8);
+  x.fillStyle='#b7dcee';x.font='28px sans-serif';
+  x.fillText('Kiérdemelte: '+(S.player||'Játékos'),70,340);
+  x.fillText('Dátum: '+o.date,70,382);
+  x.fillStyle='#ffd54a';x.font='bold 26px sans-serif';x.fillText('💧 '+S.name+' · #'+(1000+idx*7+o.date.replace(/-/g,'').slice(-4)%97),70,426);
+  cpnData=c.toDataURL('image/png');cpnName=o.n;$('#cpnImg').src=cpnData;$('#cpn').classList.add('on');
+}
+$('#cpnClose').onclick=()=>$('#cpn').classList.remove('on');
+$('#cpnShare').onclick=async()=>{
+  const P=window.Capacitor&&window.Capacitor.Plugins;
+  try{
+    if(P&&P.Share&&P.Filesystem){
+      const r=await P.Filesystem.writeFile({path:'kupon-'+Date.now()+'.png',data:cpnData.split(',')[1],directory:'CACHE'});
+      await P.Share.share({title:'Kupon',text:'🎟️ '+cpnName,files:[r.uri],dialogTitle:'Kupon küldése'});return}
+    const blob=await (await fetch(cpnData)).blob(),f=new File([blob],'kupon.png',{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Kupon'});return}
+  }catch(e){if(/cancel|abort/i.test(String(e&&(e.message||e.name))))return}
+  toast('Tartsd nyomva a képet, vagy készíts képernyőfotót');
+};
+const HATS=[
+  {id:'h_bow',e:'🎀',n:'Masni',p:80},{id:'h_cap',e:'🧢',n:'Baseball sapka',p:90},{id:'h_shades',e:'🕶️',n:'Napszemüveg',p:100,eyes:1},
+  {id:'h_straw',e:'👒',n:'Szalmakalap',p:110},{id:'h_top',e:'🎩',n:'Cilinder',p:120},{id:'h_grad',e:'🎓',n:'Diplomás kalap',p:130},{id:'h_crown',e:'👑',n:'Korona',p:300}];
+const SKINS={blue:['#7dd3fc','#0284c7'],mint:['#86efac','#16a34a'],purple:['#d8b4fe','#7e22ce'],pink:['#f9a8d4','#db2777'],orange:['#fdba74','#ea580c']};
+const SKINL=[{id:'blue',n:'Klasszik kék',p:0},{id:'mint',n:'Menta',p:80},{id:'purple',n:'Lila',p:80},{id:'pink',n:'Rózsaszín',p:100},{id:'orange',n:'Narancs',p:100}];
+function renderWard(){
+  const row=(left,n,p,own,on,act)=>`<div class="item"><span class="e">${left}</span><div class="n">${n}${own?'':`<small>🪙 ${p}</small>`}</div><button class="${on?'use':''}" ${(!own&&S.coins<p)?'disabled':''} data-c="${act}">${own?(on?'✔ Visel':'Felvesz'):'Vásárlás'}</button></div>`;
+  $('#wardrobe').innerHTML=`<div class="item"><span class="e">🏷️</span><div class="n">${S.name}<small>A kabala neve</small></div><button data-c="name">✏️ Átnevez</button></div>`
+   +(S.hat?`<div class="item"><span class="e">🚫</span><div class="n">Kalap levétele</div><button data-c="hat:">Levesz</button></div>`:'')
+   +HATS.map(h=>row(h.e,h.n,h.p,S.own[h.id],S.hat===h.id,'hat:'+h.id)).join('')
+   +SKINL.map(k=>row(`<span class="sw" style="background:linear-gradient(${SKINS[k.id][0]},${SKINS[k.id][1]})"></span>`,k.n,k.p,k.p===0||S.own['s_'+k.id],S.skin===k.id,'skin:'+k.id)).join('');
+}
+$('#wardrobe').onclick=async e=>{
+  const b=e.target.closest('[data-c]');if(!b)return;const a=b.dataset.c;
+  if(a==='name'){const v=(await ask('Hogy hívják a kabalát?',{input:1,def:S.name}));if(v&&v.trim()){S.name=v.trim().slice(0,16);save();render();scheduleReminders()}return}
+  const [t,id]=a.split(':');
+  if(t==='hat'){
+    if(id===''){S.hat=''}else{const h=HATS.find(x=>x.id===id);
+      if(!S.own[id]){if(S.coins<h.p||!await ask(h.e+' '+h.n+' – '+h.p+' érme. Megveszed?'))return;S.coins-=h.p;S.own[id]=1;confetti(60)}
+      S.hat=id}
+  }else{const k=SKINL.find(x=>x.id===id);
+    if(k.p&&!S.own['s_'+id]){if(S.coins<k.p||!await ask(k.n+' szín – '+k.p+' érme. Megveszed?'))return;S.coins-=k.p;S.own['s_'+id]=1;confetti(60)}
+    S.skin=id}
+  save();render();
+};
+$('#chestBtn').onclick=openChest;
+$('#cAdd').onclick=()=>{const n=$('#cName').value.trim();if(!n)return;const p=nextCustomPrice();S.customCount++;
+  S.custom.push({id:'c'+Date.now(),e:'🎁',n,p});$('#cName').value='';save();render();toast('Jutalom hozzáadva: '+p+' érme')};
+
+/* ---- UI ---- */
+function mascot(p,dry){
+  const mouth=p>=1?'M82 150 q18 22 36 0':dry?'M86 162 q14-12 28 0':p>=.5?'M85 152 q15 12 30 0':p>=.2?'M88 156 h24':'M86 160 q14-10 28 0';
+  const hat=HATS.find(h=>h.id===S.hat);
+  let eyes=p>=1?'<path d="M72 128 q8-10 16 0M112 128 q8-10 16 0" stroke="#0c4a6e" stroke-width="5" fill="none" stroke-linecap="round"/>'
+    :dry?'<path d="M70 128 q8 8 16 0M114 128 q8 8 16 0" stroke="#0c4a6e" stroke-width="5" fill="none" stroke-linecap="round"/><ellipse cx="128" cy="144" rx="3.5" ry="6" fill="#bae6fd"/>'
+    :'<circle cx="80" cy="128" r="7" fill="#0c4a6e"/><circle cx="120" cy="128" r="7" fill="#0c4a6e"/><circle cx="82" cy="125" r="2.5" fill="#fff"/><circle cx="122" cy="125" r="2.5" fill="#fff"/>';
+  let acc='';
+  if(hat)acc=hat.eyes?`<text x="100" y="140" font-size="46" text-anchor="middle">${hat.e}</text>`:`<text x="100" y="106" font-size="40" text-anchor="middle">${hat.e}</text>`;
+  $('#face').innerHTML=`${eyes}<ellipse cx="62" cy="148" rx="9" ry="6" fill="#f472b6" opacity=".5"/><ellipse cx="138" cy="148" rx="9" ry="6" fill="#f472b6" opacity=".5"/><path d="${mouth}" stroke="#0c4a6e" stroke-width="5" fill="none" stroke-linecap="round"/>${acc}`;
+}
+function isDry(){
+  const h=new Date().getHours();
+  if(S.goalDays[today()]||h<S.from+3||h>S.to)return false;
+  return sum()/S.goal<Math.min(1,(h-S.from)/(S.to-S.from))-0.35;
+}
+function render(){
+  const cur=sum(),p=Math.min(1,cur/S.goal),L=level(S.xp);
+  $('#cur').textContent=cur;$('#goal').textContent=S.goal;
+  // víz szint: 250 (üres) → 40 (tele)
+  $('#water').setAttribute('transform','translate(0,'+(235-p*190)+')');
+  $('#mood').textContent=p>=1?'Hurrá, mai cél kész! 🎉':p>=.5?'Szuper úton vagy! 💪':p>0?'Jó kezdés, igyál még!':rnd(['Szomjas vagyok… 🥺','Porzik a veséd! 🏜️','Megöregszik a bőröd! 👵']);
+  const dry=isDry();$('#hero').classList.toggle('dry',dry&&p<1);$('#hero').classList.toggle('dance',p>=1);
+  if(dry&&p<1)$('#mood').textContent=rnd(['Elszáradok… 🏜️','Porzik a veséd! 🏜️','Megöregszik a bőröd! 👵','Kérek egy kortyot… 🥺']);
+  const sk=SKINS[S.skin]||SKINS.blue;$$('#wg stop').forEach((n,i)=>n.setAttribute('stop-color',sk[i]));
+  $('#chestCard').classList.toggle('on',S.chest===today());
+  mascot(p,dry);renderWard();S.best=Math.max(S.best,streak());renderShop();
+  $('#weekly').innerHTML=`🏆 Heti kihívás: <b>${Math.min(WEEK_NEED,weekDone())}/${WEEK_NEED}</b> teljesített nap = ${WEEK_COINS} érme<div class="bar"><i style="width:${Math.min(1,weekDone()/WEEK_NEED)*100}%;background:linear-gradient(90deg,#4ade80,#16a34a)"></i></div><small style="color:var(--dim)">Érme: napi max. ${DRINK_CAP} ivásból, ${GOAL_COINS} a célért. Két ivás között 20 perc kell.</small>`;
+  $('#lvlName').textContent=levelName(L);
+  const a=needFor(L),b=needFor(L+1);
+  $('#xpBar').style.width=((S.xp-a)/(b-a)*100)+'%';
+  $('#xpTxt').textContent=S.xp+' / '+b+' XP';
+  $('#streak').textContent=streak();$('#coins').textContent=S.coins;
+  // küldetések
+  const d=logs(),cl=S.claimed[today()]||{};
+  $('#quests').innerHTML=todaysQuests().map(q=>`<div class="quest ${cl[q.id]?'done':''}"><div class="q">${cl[q.id]?'✅':'⬜'} ${q.t}<small>${q.prog(d)}</small></div><div class="xp">+${q.xp} XP</div></div>`).join('');
+  // napló
+  $('#todayLog').innerHTML=d.length?[...d].reverse().map(l=>`<div class="log"><span>${(TYPES[l.type]||TYPES.viz).e} ${l.raw||l.ml} ml${l.raw&&l.raw!==l.ml?` <small style="color:var(--dim)">→ ${l.ml} ml vízként</small>`:''}</span><span style="color:var(--dim)">${new Date(l.t).toTimeString().slice(0,5)}</span></div>`).join(''):'<span style="color:var(--dim)">Még nem ittál ma.</span>';
+  // jelvények
+  $('#badges').innerHTML=BADGES.map(b=>`<div class="badge ${S.badges[b.id]?'got':''}"><span class="e">${b.e}</span><b>${b.n}</b><br><span style="color:var(--dim)">${b.d}</span></div>`).join('');
+  const days=Object.keys(S.days).length;
+  $('#stats').innerHTML=`<div class="log"><span>Összes ivott víz</span><b>${(total()/1000).toFixed(1)} l</b></div><div class="log"><span>Aktív napok</span><b>${days}</b></div><div class="log"><span>Teljesített napok</span><b>${Object.keys(S.goalDays).length}</b></div><div class="log"><span>Szint</span><b>${L}</b></div>`;
+  // heti
+  const ks=[...Array(7)].map((_,i)=>addDays(today(),i-6)),vals=ks.map(k=>sum(k)),mx=Math.max(S.goal,...vals);
+  const dn=['V','H','K','Sz','Cs','P','Szo'];
+  $('#week').innerHTML=ks.map((k,i)=>{const dt=new Date(k.replace(/-/g,'/'));return `<div><small>${vals[i]?(vals[i]/1000).toFixed(1):''}</small><i class="${vals[i]>=S.goal?'ok':''}" style="height:${vals[i]/mx*100}px"></i>${dn[dt.getDay()]}</div>`}).join('');
+  const okd=vals.filter(v=>v>=S.goal).length;
+  $('#weekTxt').innerHTML=`Átlag: <b>${Math.round(vals.reduce((a,b)=>a+b,0)/7)} ml</b> / nap<br>Teljesített napok: <b>${okd}/7</b>`;
+}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)}
+
+/* ---- Konfetti ---- */
+function confetti(n){
+  const c=$('#fx'),x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;
+  const cols=['#38bdf8','#fde047','#4ade80','#f472b6','#fff'];
+  const ps=[...Array(n)].map(()=>({x:innerWidth/2,y:innerHeight*.45,vx:(Math.random()-.5)*14,vy:-Math.random()*14-4,s:4+Math.random()*6,c:cols[Math.random()*5|0],r:Math.random()*6}));
+  let f=0;(function step(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});
+    if(++f<110)requestAnimationFrame(step);else x.clearRect(0,0,c.width,c.height)})();
+  try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}
+}
+
+/* ---- Események ---- */
+$('#quick').innerHTML=QUICK.map(m=>`<button data-ml="${m}">${m==150?'☕':m==250?'🥛':m==330?'🥤':'🍶'}<br>${m}<small>ml</small></button>`).join('');
+function renderTypes(){
+  $('#types').innerHTML=Object.entries(TYPES).map(([k,t])=>`<button data-t="${k}" class="${k===curType?'on':''}">${t.e} ${t.n}</button>`).join('');
+  const T=TYPES[curType];$('#typeHint').textContent=T.water?'':`${T.n}: a mennyiség ${Math.round(T.f*100)}%-a számít vízként (érme és XP is eszerint).`;
+}
+$('#types').onclick=e=>{const b=e.target.closest('button');if(!b)return;curType=b.dataset.t;renderTypes()};
+renderTypes();
+$('#quick').onclick=e=>{const b=e.target.closest('button');if(b)drink(+b.dataset.ml)};
+$('#custom').onclick=async()=>{const v=parseInt(await ask('Hány ml-t ittál?',{input:1,def:'200',type:'number'}));if(v)drink(v)};
+document.querySelector('.chip:last-child').onclick=()=>document.querySelector('nav [data-v=shop]').click();
+$('#undo').onclick=()=>{const a=logs();if(!a.length)return;const l=a.pop();S.xp=Math.max(0,S.xp-(l.x||0));S.coins=Math.max(0,S.coins-(l.c||0));
+  if(S.goalDays[today()]&&sum()<S.goal)delete S.goalDays[today()];save();render();toast('Visszavonva: '+l.ml+' ml')};
+$$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.toggle('on',x===b));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('main').scrollTop=0});
+$('#chk').onclick=()=>checkUpdate(true);
+function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sPlayer').value=S.player}
+$('#sSave').onclick=()=>{S.goal=Math.min(6000,Math.max(500,+$('#sGoal').value||2000));S.rem=+$('#sRem').value;S.from=+$('#sFrom').value;S.to=+$('#sTo').value;S.player=$('#sPlayer').value.trim()||'Mónika';save();render();scheduleReminders();toast('Mentve ✔')};
+$('#reset').onclick=async()=>{if(await ask('Biztosan törlöd az összes adatot?')){localStorage.removeItem(KEY);S=load();fix();fillSet();render();scheduleReminders()}};
+
+/* ---- Emlékeztetők (Capacitor Local Notifications) ---- */
+const MSGS=[
+'Megöregszik a bőröd! 👵 Igyál vizet!','Porzik a veséd! 🏜️ Egy pohárral nem lesz baj!','Az agyad már aszalt szilvára hasonlít 🍑','A tested 60%-ban víz volt. Nálad már csak 12%? 😬',
+'Száraz vagy, mint a kenyérhéj 🥖','A kaktusz is többet iszik nálad 🌵','A Szahara üzeni: ők jobban állnak vízzel 🐪','Ráncot kapsz, nem csak kávét ihatsz! ☕',
+'Fáj a fejed? Nem véletlen. Igyál! 🤕','A veséid sztrájkolnak, tárgyalj velük egy pohár vízzel 🪧','Szárad a szád, mint a mazsola 🍇','A szériád veszélyben! 🔥 Igyál, mielőtt elpárolog.',
+'Ha nem iszol, kiszáradsz, mint a tavalyi karácsonyi bejgli 🎄','Még a kerti pocsolya is frissebb nálad 💦','Kortyi sír, mert nem iszol! 😭','Egy korty most = egy ránccal kevesebb holnap ✨',
+'Pssz! Víz van a közelben. Ott, a konyhában. Látod? 👀','Egy korty víz = egy mosoly a vesédnek 😊','Az éjjeliszekrényen álló pohár nem dísz. Idd meg! 🥛','Az agyad 3%-on fut, a töltő víz formájában kapható 🔋',
+'Szürke vagy, mint a hétfő reggel. Igyál, és színt kap az arcod 🎨','Egy kávé nem víz! Ezt most mondom, holnap is mondom ☕🚫','A szemed alatti karikák vizet kérnek, nem korrektort 🕶️','Ha most iszol egy pohárral, megmented a mai napot 🦸'];
+const HARSH=[
+'Úgy nézel ki, mint egy aszalt szilva a kamra mélyéről. Igyál már! 🍑','Tegnapi kenyérhéj vagy: kemény, száraz, és senki sem kér belőled 🥖','{p}, a veséid üzenik: „Ennyi volt, kiköltözünk!” 📦',
+'Gratulálok, ma még semmit nem ittál. A muskátli is jobban teljesít nálad 🌸','A kaktusz sms-t küldött: „Kérlek, igyál már, szégyellem magam.” 🌵','Olyan száraz vagy, hogy a kéztörlőd kér tőled nedvességet 🧻',
+'A bőröd olyan lesz, mint egy rossz bőrönd. Igyál! 🧳','Még a mosogatórongy is nedvesebb, mint te! 🧽','A sivatag felhívott: nálad szárazabb nem lehet. 🐪',
+'Az utolsó csepp víz is elpárolgott az agyadból. Szia, gondolkodás! 👋🧠','A ráncaid hamarosan külön személyit kapnak 🪪','Egy szárazföldi hal vagy. Hallod? Hiányzik a víz. 🐟',
+'A veséid már a hagyatéki tárgyaláson vannak. Igyál, vagy örökölnek! ⚖️','Hé, {p}! A víz nem harap. A száraz bőröd viszont már fogat növesztett 🦷','Ha ennyit iszol, a pohárnak is jobb dolga van a szekrényben 🥂',
+'Szomjan halsz és még csodálkozol, hogy fáj a fejed? Komolyan? 🤦','A száraz bőröd már üzenetet is hagyott: „Víz, hol vagy?” ✉️','Ma még egy kortyot sem ittál. A zokni is többet iszik a mosógépben 🧦'];
+const TITLES=[()=>S.name+' figyelmeztet 💧','Igyál már!','Vészjelzés! 🚨','Szomjas vagy!','Ez most komoly! 😤','{p} szerint sem jó ez! 🙄'];
+const rnd=a=>a[Math.random()*a.length|0];
+const fmt=m=>m.replace(/Kortyi/g,S.name).replace(/\{p\}/g,S.player||'Te');
+let schedT;
+function rescheduleSoon(){clearTimeout(schedT);schedT=setTimeout(scheduleReminders,1500)}
+async function scheduleReminders(){
+  const LN=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;if(!LN)return;
+  try{
+    const pend=await LN.getPending();if(pend.notifications.length)await LN.cancel(pend);
+    if(!S.rem)return;
+    const perm=await LN.requestPermissions();if(perm.display!=='granted')return;
+    const notifications=[];let id=1;const now=Date.now();
+    // csak akkor szól, ha nem ivott: az utolsó ivás után késleltet, a cél teljesítése után a nap hátralévő része csendes
+    const last=Math.max(0,...logs().map(l=>l.t)),gap=Math.max(75,S.rem*60*.8)*60000;
+    for(let d=0;d<7&&notifications.length<60;d++){
+      if(d===0&&S.goalDays[today()])continue;
+      for(let h=S.from;h<=S.to&&notifications.length<60;h+=S.rem){
+        const t=new Date();t.setDate(t.getDate()+d);t.setHours(h,Math.random()*30|0,0,0);
+        if(t.getTime()<=now)continue;
+        if(d===0&&last&&t.getTime()<last+gap)continue;
+        const dry=d===0&&sum()<S.goal*.3&&h>=14;
+        const body=fmt(rnd((dry||Math.random()<.4)?HARSH:[...MSGS,...HARSH.slice(0,6)]));
+        const tt=rnd(TITLES),title=fmt(typeof tt==='function'?tt():tt);
+        notifications.push({id:id++,title,body,schedule:{at:t,allowWhileIdle:true}});
+      }
+    }
+    if(notifications.length)await LN.schedule({notifications});
+  }catch(e){console.log(e)}
+}
+
+/* ---- Automatikus frissítés (GitHub Pages) ---- */
+const UPDATE_BASE='https://irnik80-dotcom.github.io/kortyi/';
+const isNative=()=>!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+async function checkUpdate(manual){
+  if(!isNative()&&!window.__forceUpdateCheck){if(manual)toast('Frissítés csak a telepített appban van');return}
+  try{
+    const j=await (await fetch(UPDATE_BASE+'version.json?t='+Date.now(),{cache:'no-store'})).json();
+    let have=APP_V;try{const u=JSON.parse(localStorage.getItem('kortyi.update')||'null');if(u&&u.v>have)have=u.v}catch(e){}
+    if(!(j.v>have)){if(manual)toast('✔ A legfrissebb verzió van meg (v'+APP_V+')');return}
+    const h=await (await fetch(UPDATE_BASE+'index.html?t='+Date.now(),{cache:'no-store'})).text();
+    if(!h.includes('KORTYI_APP')||!h.includes('var V='+j.v+';'))throw new Error('bad');
+    localStorage.setItem('kortyi.update',JSON.stringify({v:j.v,html:h}));
+    if(await ask('Új verzió érhető el (v'+j.v+'). Újraindítod most?'))location.reload();else toast('A frissítés a következő indításkor él');
+  }catch(e){if(manual)toast('Nem sikerült a frissítés-ellenőrzés (nincs net?)')}
+}
+
+applyFreezes();fillSet();checkQuests();checkBadges();save();render();scheduleReminders();
+try{localStorage.setItem('kortyi.boot','ok')}catch(e){}
+setTimeout(()=>checkUpdate(false),4000);
+setInterval(()=>{try{render()}catch(e){}},300000);
+window.KT={get S(){return S},today,logs,sum,save,render,checkUpdate,drink,streak,scheduleReminders};
+}}
+</script>
+</body>
+</html>
