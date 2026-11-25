@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=13;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=14;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -127,6 +127,7 @@ nav button.on{color:var(--acc)}
 #rt select,#rt input{width:150px}
 .rtl{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:.9rem}
 .rtl button{border:0;background:none;color:var(--dim);font-size:1rem;padding:2px 8px}
+#bubblyCard{background:linear-gradient(135deg,#be185d,#f59e0b);text-align:center;font-weight:700;font-size:.95rem}
 canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
 .wave1{animation:w 4s linear infinite}.wave2{animation:w 6s linear infinite reverse}
 @keyframes w{to{transform:translateX(-120px)}}
@@ -167,6 +168,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
   <div class="row"><button class="btn" id="custom">✏️ Egyedi</button><button class="btn" id="undo">↩️ Visszavon</button></div>
   <div class="row"><button class="btn" id="retro">🕒 Utólag beírom</button></div>
   <div class="card" id="seasonCard" hidden></div>
+  <div class="card" id="bubblyCard" hidden></div>
   <div class="card" id="chestCard"><div id="chestTxt">🎁 Meglepetés láda vár!</div><button id="chestBtn">Kinyitom</button></div>
   <div class="card" id="monster"></div>
   <div class="card" id="weekly"></div>
@@ -221,6 +223,8 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
   <div class="card"><b>🧒 Gyerek mód</b>
     <label class="f">Gyerek mód<select id="sKid"><option value="0">Ki</option><option value="1">Be (11–14 év)</option></select></label>
     <small style="color:var(--dim);display:block">Szelíd viccek, gyerekes jutalmak (fagyi, játékidő, mozi), 1800 ml cél és napközbeni csendes idő (8–14 óra).</small></div>
+  <div class="card"><label class="f">🥂 Pezsgő-péntek (felnőtt)<select id="sBub"><option value="1">Be</option><option value="0">Ki</option></select></label>
+    <small style="color:var(--dim);display:block">Péntek 20:00 után a beírt pezsgő/prosecco +25 arany pohárként (legfeljebb 2), ha aznap a napi cél 80%-át megitta. Csütörtök délelőtt emlékeztet.</small></div>
   <div class="card"><b>🎯 Ajánlott napi cél</b>
     <label class="f">Testsúly (kg)<input type="number" id="gW" min="30" max="200"></label>
     <label class="f">Magasság (cm)<input type="number" id="gH" min="100" max="230"></label>
@@ -282,7 +286,7 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
   return {}}
 function fix(){const D={goal:2150,monsterRes:{},trophies:[],monsterFrom:'',weight:65,height:163,act:33,chestMsgs:[],xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
-  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0};
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true};
   for(const k in D)if(S[k]===undefined)S[k]=D[k];
   if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}}
 fix();
@@ -392,28 +396,35 @@ function addXp(n,why){
 }
 const levelName=L=>'Sz.'+L+' · '+NAMES[Math.min(NAMES.length-1,Math.floor((L-1)/1.5))];
 
-const COOLDOWN=20*60000,DRINK_CAP=15,GOAL_COINS=15,WEEK_NEED=5,WEEK_COINS=60;
+const BUB_NEED=.8,BUB_COINS=25,COOLDOWN=20*60000,DRINK_CAP=15,GOAL_COINS=15,WEEK_NEED=5,WEEK_COINS=60;
 function weekKey(k){const [y,m,d]=k.split('-').map(Number);const dt=new Date(y,m-1,d);return dkey(new Date(y,m-1,d-((dt.getDay()+6)%7)))}
 const weekDone=(d=today())=>{const w=weekKey(d);return Object.keys(S.goalDays).filter(k=>weekKey(k)===w).length};
-const TYPES={viz:{e:'💧',n:'Víz',f:1,water:1},tea:{e:'🍵',n:'Tea',f:.95,water:1},shake:{e:'💪',n:'Shake (vízzel)',f:.95,water:1},kave:{e:'☕',n:'Kávé',f:.9,water:1},kakao:{e:'🥛',n:'Kakaó / tej',f:.5},shakeT:{e:'🥤',n:'Shake (tejjel)',f:.5},udito:{e:'🧃',n:'Üdítő',f:.3}};
+const TYPES={viz:{e:'💧',n:'Víz',f:1,water:1},tea:{e:'🍵',n:'Tea',f:.95,water:1},shake:{e:'💪',n:'Shake (vízzel)',f:.95,water:1},kave:{e:'☕',n:'Kávé',f:.9,water:1},kakao:{e:'🥛',n:'Kakaó / tej',f:.5},shakeT:{e:'🥤',n:'Shake (tejjel)',f:.5},udito:{e:'🧃',n:'Üdítő',f:.3},pezsgo:{e:'🥂',n:'Pezsgő / Prosecco',f:0,bubbly:1}};
 let curType='viz';
 function drink(raw,type=curType,when){
   if(!(raw>0)||raw>1000){toast('Egyszerre legfeljebb 1000 ml');return}
   const T=TYPES[type]||TYPES.viz,ml=Math.round(raw*T.f);
   const now=when?new Date(when):new Date(),k=dkey(now),arr=(S.days[k]=S.days[k]||[]);
-  const q=!arr.some(l=>l.q&&Math.abs(l.t-now.getTime())<COOLDOWN);
+  const q=!T.bubbly&&!arr.some(l=>l.q&&Math.abs(l.t-now.getTime())<COOLDOWN);
   const before=sum(k);
   const e={ml,raw,type,t:now.getTime(),h:now.getHours(),q:q?1:0,c:0,x:0};
+  if(T.bubbly&&!S.kid&&S.bubblyOn&&now.getDay()===5&&now.getHours()>=20&&arr.filter(l=>l.bq).length<2)e.bq=1;
   if(q){const credited=Math.max(0,Math.min(ml,S.goal-before));e.c=Math.round(DRINK_CAP*credited/S.goal);e.x=Math.round(ml/10)}
   arr.push(e);arr.sort((a,b)=>a.t-b.t);S.coins+=e.c;
   if(!when){drinkSound();monHit=true;setTimeout(()=>{monHit=false;try{renderMonster()}catch(x){}},700)}
   if(q)addXp(e.x);
-  if(!q)toast(T.e+' Naplózva. Arany és XP 20 percenként jár.');else if(!T.water)toast(T.e+' '+raw+' ml '+T.n.toLowerCase()+' = '+ml+' ml vízként számít');
+  if(T.bubbly)toast(e.bq?'🥂 Egészségedre! Beírva, a bónuszhoz a napi cél 80%-a kell.':'🥂 Beírva (vízként nem számít)');
+  else if(!q)toast(T.e+' Naplózva. Arany és XP 20 percenként jár.');else if(!T.water)toast(T.e+' '+raw+' ml '+T.n.toLowerCase()+' = '+ml+' ml vízként számít');
   if(q){const t=S.tod[k]=S.tod[k]||{},h=now.getHours();
     if(h<10&&!t.m){t.m=1;addXp(10,'– reggeli pohár ☀️')}
     if(h>=S.to-1&&!t.e){t.e=1;addXp(10,'– esti pohár 🌙')}}
-  checkGoal(now,k);checkMonster();checkQuests();checkBadges();save();render();rescheduleSoon();
+  checkGoal(now,k);checkBubbly(k);checkMonster();checkQuests();checkBadges();save();render();rescheduleSoon();
 }
+function checkBubbly(k){const a=logs(k);let paid=a.filter(l=>l.bpaid).length;
+  for(const l of a){if(!l.bq||l.bpaid||paid>=2)continue;
+    if(sum(k)>=BUB_NEED*S.goal){l.bpaid=1;l.c=(l.c||0)+BUB_COINS;S.coins+=BUB_COINS;paid++;setTimeout(()=>{toast('🥂 Pezsgő-bónusz: +'+BUB_COINS+' arany!');confetti(80);play('coin')},700)}}}
+function revokeBubbly(k){if(sum(k)>=BUB_NEED*S.goal)return;
+  for(const l of logs(k))if(l.bpaid){l.bpaid=0;l.c=Math.max(0,(l.c||0)-BUB_COINS);S.coins=Math.max(0,S.coins-BUB_COINS)}}
 function checkGoal(now,k=today()){
   if(S.goalDays[k]||sum(k)<S.goal||logs(k).filter(l=>l.q).length<3)return;
   S.goalDays[k]=now.getHours();
@@ -645,7 +656,7 @@ $('#cAdd').onclick=()=>{const n=$('#cName').value.trim();if(!n)return;const p=ne
 const RT_DAYS=['Ma','Tegnap','Tegnapelőtt'];
 function rtOpen(){
   $('#rtDay').innerHTML=RT_DAYS.map((n,i)=>`<option value="${addDays(today(),-i)}">${n} (${addDays(today(),-i).slice(5).replace('-','.')}.)</option>`).join('');
-  $('#rtType').innerHTML=Object.entries(TYPES).map(([k,t])=>`<option value="${k}">${t.e} ${t.n}</option>`).join('');$('#rtType').value=curType;
+  $('#rtType').innerHTML=typeList().map(([k,t])=>`<option value="${k}">${t.e} ${t.n}</option>`).join('');$('#rtType').value=curType;
   const n=new Date();$('#rtTime').value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
   $('#rtQuick').innerHTML=QUICK.map(m=>`<button data-ml="${m}">${m}<small>ml</small></button>`).join('');
   rtRender();$('#rt').classList.add('on')}
@@ -660,7 +671,7 @@ $('#rtDay').onchange=rtRender;$('#rtAdd').onclick=()=>rtDrink(+$('#rtMl').value)
 $('#rtQuick').onclick=e=>{const b=e.target.closest('button');if(b)rtDrink(+b.dataset.ml)};
 $('#rtList').onclick=e=>{const b=e.target.closest('[data-rd]');if(!b)return;const k=$('#rtDay').value,a=logs(k),l=a[+b.dataset.rd];if(!l)return;
   S.coins=Math.max(0,S.coins-(l.c||0));S.xp=Math.max(0,S.xp-(l.x||0));a.splice(+b.dataset.rd,1);
-  if(S.goalDays[k]&&sum(k)<S.goal)delete S.goalDays[k];save();render();rtRender();rescheduleSoon()};
+  if(S.goalDays[k]&&sum(k)<S.goal)delete S.goalDays[k];revokeBubbly(k);save();render();rtRender();rescheduleSoon()};
 
 /* ---- Emlékkönyv + statisztika ---- */
 function renderMemories(){
@@ -702,6 +713,10 @@ function renderStats(){
   $('#records').innerHTML=`<div class="log"><span>Leghosszabb széria</span><b>${longestStreak()} nap</b></div><div class="log"><span>Mostani széria</span><b>${streak()} nap</b></div><div class="log"><span>Legjobb nap</span><b>${bestDay} ml</b></div><div class="log"><span>30 napos átlag</span><b>${Math.round(tot30/30)} ml</b></div><div class="log"><span>Célban volt az elmúlt 30 napból</span><b>${ok30}/30</b></div><div class="log"><span>Szint</span><b>${level(S.xp)}</b></div>`;
 }
 $('#calPrev').onclick=()=>{calOff--;renderStats()};$('#calNext').onclick=()=>{if(calOff<0){calOff++;renderStats()}};
+function renderBubbly(){const c=$('#bubblyCard'),d=seasonNow().getDay();c.hidden=!(!S.kid&&S.bubblyOn&&(d===4||d===5));if(c.hidden)return;
+  const need=Math.ceil(BUB_NEED*S.goal),have=sum();
+  c.textContent=d===4?'🥂 Holnap Pezsgő-péntek! Este 8 után a pezsgő vagy prosecco +'+BUB_COINS+' arany pohárként (legfeljebb 2), ha aznap a napi cél 80%-át megiszod.'
+   :'🥂 Ma Pezsgő-péntek! 20:00 után +'+BUB_COINS+' arany/pohár (max. 2). Víz-feltétel: '+Math.min(have,need)+'/'+need+' ml '+(have>=need?'✅':'💧')}
 function renderSeason(){const z=activeSeason(),c=$('#seasonCard');c.hidden=!z;if(z)c.textContent=z.e+' '+z.n+'! Ünnepi kabala-ruhák a szekrényben, és a napi cél +'+SEASON_BONUS+' arannyal többet ér.'}
 
 /* ---- Hangok kezelése ---- */
@@ -719,7 +734,8 @@ $('#sFile').onchange=e=>{for(const f of e.target.files){
 $('#sKid').onchange=async()=>{const on=$('#sKid').value==='1';S.kid=on;
   if(on){S.goal=1800;S.from=7;S.to=21;S.qFrom=8;S.qTo=14;S.rem=2;
     const n=await ask('Mi a gyerek játékos neve?',{input:1,def:''});S.player=(n&&n.trim())||'Kisfiú'}
-  save();fillSet();render();scheduleReminders();toast(on?'🧒 Gyerek mód bekapcsolva: cél 1800 ml':'Gyerek mód kikapcsolva')};
+  renderTypes();save();fillSet();render();scheduleReminders();toast(on?'🧒 Gyerek mód bekapcsolva: cél 1800 ml':'Gyerek mód kikapcsolva')};
+$('#sBub').onchange=()=>{S.bubblyOn=$('#sBub').value==='1';save();renderTypes();render();scheduleReminders()};
 $('#sSound').onchange=()=>{S.sound=$('#sSound').value==='1';save();play('coin')};
 
 /* ---- Havi összefoglaló kép ---- */
@@ -818,7 +834,7 @@ function render(){
   if(mode==='sleep')$('#mood').textContent='Zzz… a kabala alszik 😴 (reggel iszunk!)';
   else if(mode==='yawn')$('#mood').textContent='Hááám… jó reggelt! 🥱 Igyál egy pohár vizet ébredésre!';
   else if(mode==='sleepy')$('#mood').textContent='Ebéd utáni bágyadtság… egy pohár víz segít! 😪';
-  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderMonster();S.best=Math.max(S.best,streak());renderShop();
+  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderBubbly();renderMonster();renderTypes();S.best=Math.max(S.best,streak());renderShop();
   $('#weekly').innerHTML=`🏆 Heti kihívás: <b>${Math.min(WEEK_NEED,weekDone())}/${WEEK_NEED}</b> teljesített nap = ${WEEK_COINS} arany<div class="bar"><i style="width:${Math.min(1,weekDone()/WEEK_NEED)*100}%;background:linear-gradient(90deg,#4ade80,#16a34a)"></i></div><small style="color:var(--dim)">Arany: napi max. ${DRINK_CAP} ivásból, ${GOAL_COINS} a célért. Két ivás között 20 perc kell.</small>`;
   $('#lvlName').textContent=levelName(L);
   const a=needFor(L),b=needFor(L+1);
@@ -855,9 +871,11 @@ function confetti(n){
 
 /* ---- Események ---- */
 $('#quick').innerHTML=QUICK.map(m=>`<button data-ml="${m}">${m==150?'☕':m==250?'🥛':m==330?'🥤':'🍶'}<br>${m}<small>ml</small></button>`).join('');
+const typeList=()=>Object.entries(TYPES).filter(([k,t])=>!t.bubbly||(!S.kid&&S.bubblyOn));
 function renderTypes(){
-  $('#types').innerHTML=Object.entries(TYPES).map(([k,t])=>`<button data-t="${k}" class="${k===curType?'on':''}">${t.e} ${t.n}</button>`).join('');
-  const T=TYPES[curType];$('#typeHint').textContent=T.water?'':`${T.n}: a mennyiség ${Math.round(T.f*100)}%-a számít vízként (arany és XP is eszerint).`;
+  if(!typeList().some(([k])=>k===curType))curType='viz';
+  $('#types').innerHTML=typeList().map(([k,t])=>`<button data-t="${k}" class="${k===curType?'on':''}">${t.e} ${t.n}</button>`).join('');
+  const T=TYPES[curType];$('#typeHint').textContent=T.bubbly?'🥂 Vízként nem számít. Péntek 20:00 után +25 arany/pohár (max. 2), ha a napi cél 80%-a megvan.':T.water?'':`${T.n}: a mennyiség ${Math.round(T.f*100)}%-a számít vízként (arany és XP is eszerint).`;
 }
 $('#types').onclick=e=>{const b=e.target.closest('button');if(!b)return;curType=b.dataset.t;renderTypes()};
 renderTypes();
@@ -865,10 +883,10 @@ $('#quick').onclick=e=>{const b=e.target.closest('button');if(b)drink(+b.dataset
 $('#custom').onclick=async()=>{const v=parseInt(await ask('Hány ml-t ittál?',{input:1,def:'200',type:'number'}));if(v)drink(v)};
 document.querySelector('.chip:last-child').onclick=()=>document.querySelector('nav [data-v=shop]').click();
 $('#undo').onclick=()=>{const a=logs();if(!a.length)return;const l=a.pop();S.xp=Math.max(0,S.xp-(l.x||0));S.coins=Math.max(0,S.coins-(l.c||0));
-  if(S.goalDays[today()]&&sum()<S.goal)delete S.goalDays[today()];save();render();toast('Visszavonva: '+l.ml+' ml')};
+  if(S.goalDays[today()]&&sum()<S.goal)delete S.goalDays[today()];revokeBubbly(today());save();render();toast('Visszavonva: '+(l.raw||l.ml)+' ml')};
 $$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.toggle('on',x===b));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('main').scrollTop=0});
 $('#chk').onclick=()=>checkUpdate(true);
-function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sSound').value=S.sound?'1':'0';renderSounds();renderCm();$('#gW').value=S.weight;$('#gH').value=S.height;$('#gA').value=String(S.act);goalCalc();$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sQF').value=S.qFrom;$('#sQT').value=S.qTo;$('#sKid').value=S.kid?'1':'0';$('#sPlayer').value=S.player}
+function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sSound').value=S.sound?'1':'0';renderSounds();renderCm();$('#gW').value=S.weight;$('#gH').value=S.height;$('#gA').value=String(S.act);goalCalc();$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sQF').value=S.qFrom;$('#sQT').value=S.qTo;$('#sKid').value=S.kid?'1':'0';$('#sBub').value=S.bubblyOn?'1':'0';$('#sPlayer').value=S.player}
 $('#sSave').onclick=()=>{S.goal=Math.min(6000,Math.max(500,+$('#sGoal').value||2000));S.rem=+$('#sRem').value;S.from=+$('#sFrom').value;S.to=+$('#sTo').value;S.qFrom=+$('#sQF').value||0;S.qTo=+$('#sQT').value||0;S.player=$('#sPlayer').value.trim()||'Mónika';save();render();scheduleReminders();toast('Mentve ✔')};
 $('#reset').onclick=async()=>{if(await ask('Biztosan törlöd az összes adatot?')){localStorage.removeItem(KEY);S=load();fix();fillSet();render();scheduleReminders()}};
 
@@ -887,6 +905,11 @@ const HARSH=[
 'Az utolsó csepp víz is elpárolgott az agyadból. Szia, gondolkodás! 👋🧠','A ráncaid hamarosan külön személyit kapnak 🪪','Egy szárazföldi hal vagy. Hallod? Hiányzik a víz. 🐟',
 'A veséid már a hagyatéki tárgyaláson vannak. Igyál, vagy örökölnek! ⚖️','Hé, {p}! A víz nem harap. A száraz bőröd viszont már fogat növesztett 🦷','Ha ennyit iszol, a pohárnak is jobb dolga van a szekrényben 🥂',
 'Szomjan halsz és még csodálkozol, hogy fáj a fejed? Komolyan? 🤦','A száraz bőröd már üzenetet is hagyott: „Víz, hol vagy?” ✉️','Ma még egy kortyot sem ittál. A zokni is többet iszik a mosógépben 🧦'];
+const PEZSGO_THU=['Holnap péntek, este 8 után a pezsgő hivatalosan is jutalom! 🥂 Bónusz arany vár.','Csütörtök van, de a prosecco már a hűtőben hűl. Holnap 20:00 után bónusz jár egy pohárért! 🍾',
+ 'Hírek a Szomjúság-ügyi Minisztériumtól: pénteken este 8 után a buborékos is számít. 🫧','Szólt a hűtő: „Tegnap óta hűtöm a Proseccót. Hol maradsz?” 🥂',
+ 'A kabala már kiöltözött a pénteki buliba. Te hozod a pezsgőt, ő a bónuszt! 🎉','Péntek este a víz is megérdemel egy kis társaságot. Igyál mellé pezsgőt, és jár a bónusz! 🍾💧',
+ 'A ráncaid is felemelt pohárral várják a pénteket 🥂 (de előtte igyál vizet!)','Mondtam, hogy a víz a legjobb. De pénteken egy pohár prosecco is belefér. Mellé a víz kötelező 😉'];
+const PEZSGO_FRI=['Fel a poharat! 🥂 A pezsgő-bónusz élesítve. Ne felejtsd beírni, és egy pohár víz is jár mellé!','Péntek este van! 🍾 Ha a napi cél 80%-a megvan, a pezsgő arany!','A buborékok már várnak 🫧 Írd be a Kortyiba, és jár a bónusz! 🥂'];
 const TITLES=[()=>S.name+' figyelmeztet 💧','Igyál már!','Vészjelzés! 🚨','Szomjas vagy!','Ez most komoly! 😤','{p} szerint sem jó ez! 🙄'];
 const rnd=a=>a[Math.random()*a.length|0];
 let REMOTE={lada:[],ertesites:[]};try{const r=JSON.parse(localStorage.getItem('kortyi.msgs')||'null');if(r&&Array.isArray(r.lada))REMOTE=r}catch(e){}
@@ -920,6 +943,9 @@ async function scheduleReminders(){
         notifications.push({id:id++,title,body,schedule:{at:t,allowWhileIdle:true}});
       }
     }
+    if(!S.kid&&S.bubblyOn)for(let d=0;d<8;d++){const base=new Date();base.setDate(base.getDate()+d);const dw=base.getDay();
+      if(dw===4){const t=new Date(base);t.setHours(10,Math.random()*20|0,0,0);if(t.getTime()>now)notifications.push({id:1000+d,title:'🥂 Holnap Pezsgő-péntek!',body:fmt(rnd(PEZSGO_THU)),schedule:{at:t,allowWhileIdle:true}})}
+      if(dw===5){const t=new Date(base);t.setHours(20,Math.random()*10|0,0,0);if(t.getTime()>now)notifications.push({id:1100+d,title:'🥂 Fel a poharat!',body:fmt(rnd(PEZSGO_FRI)),schedule:{at:t,allowWhileIdle:true}})}}
     if(notifications.length)await LN.schedule({notifications});
   }catch(e){console.log(e)}
 }
