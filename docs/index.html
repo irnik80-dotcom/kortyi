@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=14;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=15;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -220,6 +220,10 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
     <label class="f">Lefekvés (óra)<input type="number" id="sTo" min="1" max="23"></label>
     <div class="row"><button class="btn pri" id="sSave">Mentés</button></div>
   </div>
+  <div class="card"><b>🔔 Értesítések</b>
+    <div id="ntStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)">Ellenőrzés…</div>
+    <div class="row"><button class="btn" id="ntCheck">🔍 Ellenőrzés</button><button class="btn pri" id="ntTest">🔔 Teszt (10 mp)</button></div>
+    <small style="color:var(--dim);display:block;margin-top:6px">Ha nem jön értesítés: Telefon Beállítások → Alkalmazások → Kortyi → Értesítések → Engedélyezés, az Akkumulátor pedig legyen „Nem korlátozott”.</small></div>
   <div class="card"><b>🧒 Gyerek mód</b>
     <label class="f">Gyerek mód<select id="sKid"><option value="0">Ki</option><option value="1">Be (11–14 év)</option></select></label>
     <small style="color:var(--dim);display:block">Szelíd viccek, gyerekes jutalmak (fagyi, játékidő, mozi), 1800 ml cél és napközbeni csendes idő (8–14 óra).</small></div>
@@ -886,6 +890,7 @@ $('#undo').onclick=()=>{const a=logs();if(!a.length)return;const l=a.pop();S.xp=
   if(S.goalDays[today()]&&sum()<S.goal)delete S.goalDays[today()];revokeBubbly(today());save();render();toast('Visszavonva: '+(l.raw||l.ml)+' ml')};
 $$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.toggle('on',x===b));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('main').scrollTop=0});
 $('#chk').onclick=()=>checkUpdate(true);
+$$('nav button').forEach(b=>{if(b.dataset.v==='set')b.addEventListener('click',()=>notifStatus(false))});
 function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sSound').value=S.sound?'1':'0';renderSounds();renderCm();$('#gW').value=S.weight;$('#gH').value=S.height;$('#gA').value=String(S.act);goalCalc();$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sQF').value=S.qFrom;$('#sQT').value=S.qTo;$('#sKid').value=S.kid?'1':'0';$('#sBub').value=S.bubblyOn?'1':'0';$('#sPlayer').value=S.player}
 $('#sSave').onclick=()=>{S.goal=Math.min(6000,Math.max(500,+$('#sGoal').value||2000));S.rem=+$('#sRem').value;S.from=+$('#sFrom').value;S.to=+$('#sTo').value;S.qFrom=+$('#sQF').value||0;S.qTo=+$('#sQT').value||0;S.player=$('#sPlayer').value.trim()||'Mónika';save();render();scheduleReminders();toast('Mentve ✔')};
 $('#reset').onclick=async()=>{if(await ask('Biztosan törlöd az összes adatot?')){localStorage.removeItem(KEY);S=load();fix();fillSet();render();scheduleReminders()}};
@@ -917,14 +922,18 @@ async function loadRemote(){try{const j=await (await fetch(UPDATE_BASE+'messages
   const clean=a=>Array.isArray(a)?a.filter(x=>typeof x==='string'&&x.length<=200).slice(0,100):[];
   REMOTE={lada:clean(j.lada),ertesites:clean(j.ertesites)};localStorage.setItem('kortyi.msgs',JSON.stringify(REMOTE))}catch(e){}}
 const fmt=m=>m.replace(/Kortyi/g,S.name).replace(/\{p\}/g,S.player||'Te');
-let schedT;
+let schedT,lastNerr='',nWarned=false;
+const LNP=()=>window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;
 function rescheduleSoon(){clearTimeout(schedT);schedT=setTimeout(scheduleReminders,1500)}
 async function scheduleReminders(){
-  const LN=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;if(!LN)return;
+  const LN=LNP();if(!LN)return;
   try{
     const pend=await LN.getPending();if(pend.notifications.length)await LN.cancel(pend);
-    if(!S.rem)return;
-    const perm=await LN.requestPermissions();if(perm.display!=='granted')return;
+    if(!S.rem&&!(!S.kid&&S.bubblyOn))return;
+    let d=(await LN.checkPermissions()).display;
+    if(d!=='granted'&&d!=='denied')d=(await LN.requestPermissions()).display;
+    if(d!=='granted'){lastNerr='Nincs értesítési engedély';if(!nWarned){nWarned=true;toast('🔔 Az értesítések le vannak tiltva. A Beállítások fülön az Értesítések résznél javíthatod.')}return}
+    lastNerr='';
     const notifications=[];let id=1;const now=Date.now();
     // csak akkor szól, ha nem ivott: az utolsó ivás után késleltet, a cél teljesítése után a nap hátralévő része csendes
     const curW=weekKey(today()),mon=(curW>=S.monsterFrom&&!S.monsterRes[curW])?monsterFor(curW):null;
@@ -940,15 +949,26 @@ async function scheduleReminders(){
         const inCur=weekKey(dkey(t))===curW,useMon=mon&&inCur&&Math.random()<.45,useLove=!S.kid&&!useMon&&REMOTE.ertesites.length&&Math.random()<.2;
         const body=fmt(useMon?rnd(monTexts(mon)):useLove?rnd(REMOTE.ertesites):S.kid?rnd(KIDMSG):rnd((dry||Math.random()<.4)?HARSH:[...MSGS,...HARSH.slice(0,6)]));
         const tt=rnd(TITLES),title=useMon?mon.e+' '+mon.n+'!':useLove?'Üzenet neked 💌':S.kid?rnd(KIDTITLES):fmt(typeof tt==='function'?tt():tt);
-        notifications.push({id:id++,title,body,schedule:{at:t,allowWhileIdle:true}});
+        notifications.push({id:id++,title,body,schedule:{at:t,allowWhileIdle:true},isExactNotification:false});
       }
     }
     if(!S.kid&&S.bubblyOn)for(let d=0;d<8;d++){const base=new Date();base.setDate(base.getDate()+d);const dw=base.getDay();
-      if(dw===4){const t=new Date(base);t.setHours(10,Math.random()*20|0,0,0);if(t.getTime()>now)notifications.push({id:1000+d,title:'🥂 Holnap Pezsgő-péntek!',body:fmt(rnd(PEZSGO_THU)),schedule:{at:t,allowWhileIdle:true}})}
-      if(dw===5){const t=new Date(base);t.setHours(20,Math.random()*10|0,0,0);if(t.getTime()>now)notifications.push({id:1100+d,title:'🥂 Fel a poharat!',body:fmt(rnd(PEZSGO_FRI)),schedule:{at:t,allowWhileIdle:true}})}}
+      if(dw===4){const t=new Date(base);t.setHours(10,Math.random()*20|0,0,0);if(t.getTime()>now)notifications.push({id:1000+d,title:'🥂 Holnap Pezsgő-péntek!',body:fmt(rnd(PEZSGO_THU)),schedule:{at:t,allowWhileIdle:true},isExactNotification:false})}
+      if(dw===5){const t=new Date(base);t.setHours(20,Math.random()*10|0,0,0);if(t.getTime()>now)notifications.push({id:1100+d,title:'🥂 Fel a poharat!',body:fmt(rnd(PEZSGO_FRI)),schedule:{at:t,allowWhileIdle:true},isExactNotification:false})}}
     if(notifications.length)await LN.schedule({notifications});
-  }catch(e){console.log(e)}
+  }catch(e){lastNerr=String(e&&(e.message||e));console.log(e)}
 }
+async function notifStatus(askPerm){const LN=LNP(),el=$('#ntStatus');
+  if(!LN){el.textContent='Ez csak a telepített appban működik.';return null}
+  try{let d=(await LN.checkPermissions()).display;if(d!=='granted'&&askPerm&&d!=='denied')d=(await LN.requestPermissions()).display;
+    const n=(await LN.getPending()).notifications.length;
+    el.innerHTML=(d==='granted'?'✅ Engedélyezve':d==='denied'?'⛔ Le van tiltva (a Telefon Beállításaiban kell engedélyezni)':'❔ Még nincs engedély')+' · Ütemezett értesítés: <b>'+n+'</b>'+(lastNerr?'<br><small>Utolsó üzenet: '+lastNerr.replace(/[<>&]/g,'')+'</small>':'');return d}
+  catch(e){el.textContent='Hiba: '+String(e&&(e.message||e)).replace(/[<>&]/g,'');return null}}
+$('#ntCheck').onclick=async()=>{const d=await notifStatus(true);if(d==='granted'){await scheduleReminders();notifStatus(false)}};
+$('#ntTest').onclick=async()=>{const LN=LNP();if(!LN){toast('Csak a telepített appban működik');return}
+  const d=await notifStatus(true);if(d!=='granted'){toast('Előbb engedélyezd az értesítéseket');return}
+  try{await LN.schedule({notifications:[{id:9999,title:S.name+' próba 🔔',body:'Ha ezt látod, működnek az értesítések! 🎉',schedule:{at:new Date(Date.now()+10000),allowWhileIdle:true},isExactNotification:false}]});toast('Teszt 10 mp múlva érkezik. Zárd le a képernyőt vagy lépj ki az appból!')}
+  catch(e){lastNerr=String(e&&(e.message||e));notifStatus(false)}};
 
 /* ---- Automatikus frissítés (GitHub Pages) ---- */
 const UPDATE_BASE='https://irnik80-dotcom.github.io/kortyi/';

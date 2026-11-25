@@ -1,1 +1,14 @@
-{"appId":"hu.kortyi.vizivo","appName":"Kortyi","webDir":"docs","android":{"backgroundColor":"#0b3d5c"}}
+{
+ "appId": "hu.kortyi.vizivo",
+ "appName": "Kortyi",
+ "webDir": "docs",
+ "android": {
+  "backgroundColor": "#0b3d5c"
+ },
+ "plugins": {
+  "LocalNotifications": {
+   "smallIcon": "ic_stat_water",
+   "iconColor": "#38BDF8"
+  }
+ }
+}
