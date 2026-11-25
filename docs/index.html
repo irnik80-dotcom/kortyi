@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=15;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=16;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -220,6 +220,11 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
     <label class="f">Lefekvés (óra)<input type="number" id="sTo" min="1" max="23"></label>
     <div class="row"><button class="btn pri" id="sSave">Mentés</button></div>
   </div>
+  <div class="card"><b>👫 Megosztás a párommal</b>
+    <div id="shStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)"></div>
+    <div class="row"><button class="btn pri" id="shOn">Bekapcsolás</button><button class="btn" id="shLink">📤 Link küldése</button></div>
+    <div class="row"><button class="btn" id="shNew">🔑 Új kód</button></div>
+    <small style="color:var(--dim);display:block;margin-top:6px">A párod élőben látja az ivásaidat (időponttal), az aranyadat, szériádat és a szörny állását. Titkosítva megy, csak a link birtokosa olvashatja. Bármikor kikapcsolhatod.</small></div>
   <div class="card"><b>🔔 Értesítések</b>
     <div id="ntStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)">Ellenőrzés…</div>
     <div class="row"><button class="btn" id="ntCheck">🔍 Ellenőrzés</button><button class="btn pri" id="ntTest">🔔 Teszt (10 mp)</button></div>
@@ -290,11 +295,12 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
   return {}}
 function fix(){const D={goal:2150,monsterRes:{},trophies:[],monsterFrom:'',weight:65,height:163,act:33,chestMsgs:[],xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
-  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true};
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:false,code:'',last:0}};
   for(const k in D)if(S[k]===undefined)S[k]=D[k];
   if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}}
 fix();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  if(S.share&&S.share.on&&typeof shareSoon==='function')shareSoon()}
 
 const logs=(k=today())=>S.days[k]||[];
 const sum=(k=today())=>logs(k).reduce((a,l)=>a+l.ml,0);
@@ -395,7 +401,7 @@ const info=m=>ask(m,{ok:1});
 /* ---- Művelet ---- */
 function addXp(n,why){
   const before=level(S.xp);S.xp+=n;const after=level(S.xp);
-  if(after>before){toast('⬆️ Szintlépés! '+levelName(after));confetti(120);play('level');S.coins+=5*(after-before)}
+  if(after>before){addEvent('⬆️ Szintlépés: '+levelName(after));toast('⬆️ Szintlépés! '+levelName(after));confetti(120);play('level');S.coins+=5*(after-before)}
   else if(why)toast('+'+n+' XP '+why);
 }
 const levelName=L=>'Sz.'+L+' · '+NAMES[Math.min(NAMES.length-1,Math.floor((L-1)/1.5))];
@@ -435,9 +441,10 @@ function checkGoal(now,k=today()){
   const st=streak();S.best=Math.max(S.best,st);
   if(!S.goalPaid[k]){S.goalPaid[k]=1;addXp(50+Math.min(st,10)*5);S.coins+=GOAL_COINS;if(activeSeason())S.coins+=SEASON_BONUS}
   const td=k===today();if(td)S.chest=k;
+  addEvent('🎉 Napi cél teljesítve ('+sum(k)+' ml)'+(td?'':' – utólag beírva'));if(td)shareAlert(S.player+' elérte a napi célt! 🎉');
   toast('🎉 '+(td?'Napi cél teljesítve!':'A '+k+' napi célja teljesült!')+' Széria: '+st+' nap');if(td){confetti(220);flashHero();play('goal')}
   const w=weekKey(k);
-  if(weekDone(k)>=WEEK_NEED&&!S.weekly[w]){S.weekly[w]=1;S.coins+=WEEK_COINS;
+  if(weekDone(k)>=WEEK_NEED&&!S.weekly[w]){S.weekly[w]=1;S.coins+=WEEK_COINS;addEvent('🏆 Heti kihívás teljesítve');shareAlert(S.player+' teljesítette a heti kihívást! 🏆');
     S.owned.unshift({e:'🏆',n:'Heti büszkeség-kupon',date:k,pride:1,msg:'Ezen a héten '+WEEK_NEED+' napot teljesítettem! 💪💧'});
     setTimeout(async()=>{toast('🏆 Heti kihívás kész! +'+WEEK_COINS+' arany');confetti(200);
       if(await ask('Heti kihívás kész! Elküldöd most a büszkeség-kupont?'))showCoupon(S.owned[0],0)},2800)}
@@ -482,13 +489,13 @@ function monsterFor(wk){
 const weekSum=wk=>[...Array(7)].reduce((a,_,j)=>a+sum(addDays(wk,j)),0);
 const MON_NEED=5,MON_BITE=.3;let monHit=false;
 function checkMonster(){const cur=weekKey(today());if(cur<S.monsterFrom||S.monsterRes[cur])return;
-  if(weekSum(cur)>=MON_NEED*S.goal){S.monsterRes[cur]='win';const m=monsterFor(cur);S.trophies.unshift({e:m.e,n:m.n,week:cur});
+  if(weekSum(cur)>=MON_NEED*S.goal){S.monsterRes[cur]='win';const m=monsterFor(cur);S.trophies.unshift({e:m.e,n:m.n,week:cur});addEvent('🏅 Legyőzte: '+m.n);shareAlert(S.player+' legyőzte a heti szörnyet: '+m.n+'! 🏅');
     setTimeout(()=>{toast(m.e+' Legyőzted: '+m.n+'! Trófea!');confetti(250);play('goal');flashHero()},1300)}}
 async function resolveMonsters(){const cur=weekKey(today()),msgs=[];
   for(let wk=S.monsterFrom;addDays(wk,9)<=today();wk=addDays(wk,7)){if(S.monsterRes[wk])continue;
     const m=monsterFor(wk),need=MON_NEED*S.goal,tot=weekSum(wk);
     if(tot>=need){S.monsterRes[wk]='win';S.trophies.unshift({e:m.e,n:m.n,week:wk});msgs.push('🏆 '+m.n+' legyőzve a múlt héten! Trófea a gyűjteményedben.')}
-    else{const miss=1-tot/need,bite=Math.min(S.coins,Math.floor(S.coins*MON_BITE*miss));S.coins-=bite;S.monsterRes[wk]={bite};
+    else{const miss=1-tot/need,bite=Math.min(S.coins,Math.floor(S.coins*MON_BITE*miss));S.coins-=bite;S.monsterRes[wk]={bite};addEvent('😈 '+m.n+' megette '+bite+' aranyat');
       msgs.push(bite>0?m.e+' '+m.n+' megette '+bite+' aranyadat a múlt héten! Csak '+Math.round(tot/need*100)+'%-ig győzted le. 😈':m.e+' '+m.n+' nem tudott mit enni, mert nem volt aranyad. Szerencséd volt! 😅')}}
   save();render();for(const t of msgs)await info(t)}
 function renderMonster(){
@@ -677,6 +684,59 @@ $('#rtList').onclick=e=>{const b=e.target.closest('[data-rd]');if(!b)return;cons
   S.coins=Math.max(0,S.coins-(l.c||0));S.xp=Math.max(0,S.xp-(l.x||0));a.splice(+b.dataset.rd,1);
   if(S.goalDays[k]&&sum(k)<S.goal)delete S.goalDays[k];revokeBubbly(k);save();render();rtRender();rescheduleSoon()};
 
+/* ---- Megosztás a párommal (titkosítva, ntfy.sh-n át) ---- */
+const NTFY='https://ntfy.sh/';
+let shK=null,shT=null,shErr='',shSig='';
+const b64=u=>btoa(String.fromCharCode(...u)),b64u=u=>b64(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const hex=u=>[...u].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function shareKeys(code){const e=new TextEncoder();
+  const topic='kortyi-'+hex(new Uint8Array(await crypto.subtle.digest('SHA-256',e.encode('t:'+code)))).slice(0,32);
+  const base=await crypto.subtle.importKey('raw',e.encode(code),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('kortyi-v1'),iterations:50000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt']);
+  return {topic,key}}
+function addEvent(t){try{S.events.unshift([Date.now(),t]);S.events=S.events.slice(0,12)}catch(e){}}
+function snapshot(){const t=today(),cur=weekKey(t),m=monsterFor(cur),mid=new Date(t.replace(/-/g,'/')).getTime();
+  return {v:1,ts:Date.now(),n:S.player,k:S.name,g:S.goal,c:S.coins,st:streak(),lv:level(S.xp),tr:S.trophies.length,kid:S.kid?1:0,
+    mo:{n:m.n,e:m.e,p:Math.round(Math.min(1,weekSum(cur)/(MON_NEED*S.goal))*100),w:S.monsterRes[cur]==='win'?1:0},wk:weekDone(),
+    d:logs(t).map(l=>[Math.round((l.t-mid)/60000),l.raw||l.ml,l.type||'viz',l.ml]),
+    days:[...Array(14)].map((_,i)=>{const k=addDays(t,i-13);return [sum(k),S.goalDays[k]?1:0]}),
+    ev:S.events.slice(0,10).map(e=>[Math.round(e[0]/1000),e[1]])}}
+async function shareSend(force){
+  if(!S.share||!S.share.on||!S.share.code)return;
+  const snap=snapshot(),json=JSON.stringify(snap),sig=json.replace(/"ts":\d+,/,'');
+  if(!force&&sig===shSig)return;
+  try{shK=shK||await shareKeys(S.share.code);
+    const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},shK.key,new TextEncoder().encode(json)));
+    const out=new Uint8Array(iv.length+ct.length);out.set(iv);out.set(ct,iv.length);
+    const r=await fetch(NTFY+shK.topic,{method:'POST',body:b64(out)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    shSig=sig;shErr='';S.share.last=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  }catch(e){shErr='Küldési hiba: '+String(e&&(e.message||e)).slice(0,60)}
+  renderShare()}
+function shareSoon(){clearTimeout(shT);shT=setTimeout(()=>shareSend(false),4000)}
+async function shareAlert(msg){if(!S.share||!S.share.on||!S.share.code)return;
+  try{shK=shK||await shareKeys(S.share.code);
+    await fetch(NTFY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:shK.topic+'-a',title:'Kortyi 💧',message:msg,tags:['droplet']})})}catch(e){}}
+function renderShare(){
+  const on=!!(S.share&&S.share.on),t=S.share&&S.share.last?new Date(S.share.last).toTimeString().slice(0,5):'';
+  $('#shStatus').innerHTML=on?'✅ Bekapcsolva'+(t?' · utolsó küldés: '+t:'')+(shErr?'<br><small>'+shErr+'</small>':''):'⛔ Ki van kapcsolva, a párod nem lát semmit.';
+  $('#shOn').textContent=on?'Kikapcsolás':'Bekapcsolás';$('#shLink').disabled=!on;$('#shNew').disabled=!on}
+async function shareLink(){
+  const url=UPDATE_BASE+'figyelo/#'+S.share.code,txt='Kortyi figyelő 👀💧 '+url,P=window.Capacitor&&window.Capacitor.Plugins;
+  try{if(P&&P.Share){await P.Share.share({title:'Kortyi figyelő',text:txt,dialogTitle:'Link küldése'});return}
+    if(navigator.share){await navigator.share({title:'Kortyi figyelő',text:txt});return}}
+  catch(e){if(/cancel|abort/i.test(String(e&&(e.message||e.name))))return}
+  try{await navigator.clipboard.writeText(url);toast('Link kimásolva 📋')}catch(e){await info('Link: '+url)}}
+$('#shOn').onclick=async()=>{
+  if(S.share.on){if(await ask('Kikapcsolod a megosztást? A párod nem kap több adatot.')){S.share.on=false;save();renderShare();toast('Megosztás kikapcsolva')}return}
+  const ok=await ask('👫 Megosztás a párommal\n\nA párod ezt látja élőben:\n• minden ivásod pontos időpontját, mennyiségét és italát\n• a napi állásodat, aranyadat, szériádat, szintedet\n• a heti szörnyet és az eseményeket\n\nAz adatok titkosítva mennek, csak a link birtokosa olvashatja. A célteljesítésről egyszerű értesítés is mehet. Bármikor kikapcsolhatod. Bekapcsolod?');
+  if(!ok)return;
+  S.share={on:true,code:b64u(crypto.getRandomValues(new Uint8Array(16))),last:0};shK=null;shSig='';save();await shareSend(true);renderShare();
+  if(await ask('Bekapcsolva! Elküldöd most a linket a párodnak?'))shareLink()};
+$('#shLink').onclick=()=>{if(S.share.on)shareLink()};
+$('#shNew').onclick=async()=>{if(!S.share.on)return;if(await ask('Új kódot generálsz? A régi link megszűnik, az újat el kell küldened.')){
+  S.share.code=b64u(crypto.getRandomValues(new Uint8Array(16)));shK=null;shSig='';save();await shareSend(true);toast('Új kód kész, küldd el a linket');shareLink()}};
+
 /* ---- Emlékkönyv + statisztika ---- */
 function renderMemories(){
   const m=[...S.owned.filter(o=>o.used||o.pride).map(o=>({e:o.e,n:o.n,when:o.used||o.date,sub:(o.pride?'Heti kihívás: ':'Beváltva: ')+(o.used||o.date)+(o.msg?' · „'+o.msg+'”':'')})),
@@ -838,7 +898,7 @@ function render(){
   if(mode==='sleep')$('#mood').textContent='Zzz… a kabala alszik 😴 (reggel iszunk!)';
   else if(mode==='yawn')$('#mood').textContent='Hááám… jó reggelt! 🥱 Igyál egy pohár vizet ébredésre!';
   else if(mode==='sleepy')$('#mood').textContent='Ebéd utáni bágyadtság… egy pohár víz segít! 😪';
-  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderBubbly();renderMonster();renderTypes();S.best=Math.max(S.best,streak());renderShop();
+  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderBubbly();renderMonster();renderTypes();renderShare();S.best=Math.max(S.best,streak());renderShop();
   $('#weekly').innerHTML=`🏆 Heti kihívás: <b>${Math.min(WEEK_NEED,weekDone())}/${WEEK_NEED}</b> teljesített nap = ${WEEK_COINS} arany<div class="bar"><i style="width:${Math.min(1,weekDone()/WEEK_NEED)*100}%;background:linear-gradient(90deg,#4ade80,#16a34a)"></i></div><small style="color:var(--dim)">Arany: napi max. ${DRINK_CAP} ivásból, ${GOAL_COINS} a célért. Két ivás között 20 perc kell.</small>`;
   $('#lvlName').textContent=levelName(L);
   const a=needFor(L),b=needFor(L+1);
@@ -991,6 +1051,7 @@ try{localStorage.setItem('kortyi.boot','ok')}catch(e){}
 setTimeout(()=>checkUpdate(false),4000);
 setTimeout(loadRemote,2500);
 resolveMonsters();
+if(S.share.on)setTimeout(()=>shareSend(true),3500);
 setInterval(()=>{try{render()}catch(e){}},300000);
 /* OTA után a régi oldal maradéka duplikátumként a végére kerülhet: töröljük */
 function dedupe(){const seen=new Set();[...document.body.children].forEach(el=>{const k=el.id?'#'+el.id:el.tagName==='SCRIPT'?'script':'';if(!k)return;if(seen.has(k))el.remove();else seen.add(k)})}
