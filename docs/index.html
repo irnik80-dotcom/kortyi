@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=16;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=17;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -222,9 +222,8 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
   </div>
   <div class="card"><b>👫 Megosztás a párommal</b>
     <div id="shStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)"></div>
-    <div class="row"><button class="btn pri" id="shOn">Bekapcsolás</button><button class="btn" id="shLink">📤 Link küldése</button></div>
-    <div class="row"><button class="btn" id="shNew">🔑 Új kód</button></div>
-    <small style="color:var(--dim);display:block;margin-top:6px">A párod élőben látja az ivásaidat (időponttal), az aranyadat, szériádat és a szörny állását. Titkosítva megy, csak a link birtokosa olvashatja. Bármikor kikapcsolhatod.</small></div>
+    <div class="row"><button class="btn" id="shOn">Kikapcsolás</button></div>
+    <small style="color:var(--dim);display:block;margin-top:6px">A párod látja az ivásaidat (időponttal), az aranyadat, szériádat és a szörny állását a Figyelő oldalon. Bármikor kikapcsolhatod.</small></div>
   <div class="card"><b>🔔 Értesítések</b>
     <div id="ntStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)">Ellenőrzés…</div>
     <div class="row"><button class="btn" id="ntCheck">🔍 Ellenőrzés</button><button class="btn pri" id="ntTest">🔔 Teszt (10 mp)</button></div>
@@ -295,9 +294,10 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
   return {}}
 function fix(){const D={goal:2150,monsterRes:{},trophies:[],monsterFrom:'',weight:65,height:163,act:33,chestMsgs:[],xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
-  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:false,code:'',last:0}};
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:true,last:0,v:17,seen:false}};
   for(const k in D)if(S[k]===undefined)S[k]=D[k];
-  if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}}
+  if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}
+  if(!S.share||S.share.v!==17)S.share={on:true,last:0,v:17,seen:false}}
 fix();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   if(S.share&&S.share.on&&typeof shareSoon==='function')shareSoon()}
@@ -684,16 +684,18 @@ $('#rtList').onclick=e=>{const b=e.target.closest('[data-rd]');if(!b)return;cons
   S.coins=Math.max(0,S.coins-(l.c||0));S.xp=Math.max(0,S.xp-(l.x||0));a.splice(+b.dataset.rd,1);
   if(S.goalDays[k]&&sum(k)<S.goal)delete S.goalDays[k];revokeBubbly(k);save();render();rtRender();rescheduleSoon()};
 
-/* ---- Megosztás a párommal (titkosítva, ntfy.sh-n át) ---- */
-const NTFY='https://ntfy.sh/';
+/* ---- Megosztás a párommal (alapból bekapcsolva, ntfy.sh-n át) ---- */
+const NTFY='https://ntfy.sh/',SHARE_CODES={a:'08bRDKobLSGlCfGe5oTTIg',k:'9h0i3GMOl2CZ0t26s5IbqQ'};
+const shareCode=()=>S.kid?SHARE_CODES.k:SHARE_CODES.a;
 let shK=null,shT=null,shErr='',shSig='';
-const b64=u=>btoa(String.fromCharCode(...u)),b64u=u=>b64(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64=u=>btoa(String.fromCharCode(...u));
 const hex=u=>[...u].map(x=>x.toString(16).padStart(2,'0')).join('');
 async function shareKeys(code){const e=new TextEncoder();
   const topic='kortyi-'+hex(new Uint8Array(await crypto.subtle.digest('SHA-256',e.encode('t:'+code)))).slice(0,32);
   const base=await crypto.subtle.importKey('raw',e.encode(code),'PBKDF2',false,['deriveKey']);
   const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('kortyi-v1'),iterations:50000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt']);
-  return {topic,key}}
+  return {topic,key,code}}
+async function shareKeysFor(){const c=shareCode();if(!shK||shK.code!==c)shK=await shareKeys(c);return shK}
 function addEvent(t){try{S.events.unshift([Date.now(),t]);S.events=S.events.slice(0,12)}catch(e){}}
 function snapshot(){const t=today(),cur=weekKey(t),m=monsterFor(cur),mid=new Date(t.replace(/-/g,'/')).getTime();
   return {v:1,ts:Date.now(),n:S.player,k:S.name,g:S.goal,c:S.coins,st:streak(),lv:level(S.xp),tr:S.trophies.length,kid:S.kid?1:0,
@@ -702,40 +704,28 @@ function snapshot(){const t=today(),cur=weekKey(t),m=monsterFor(cur),mid=new Dat
     days:[...Array(14)].map((_,i)=>{const k=addDays(t,i-13);return [sum(k),S.goalDays[k]?1:0]}),
     ev:S.events.slice(0,10).map(e=>[Math.round(e[0]/1000),e[1]])}}
 async function shareSend(force){
-  if(!S.share||!S.share.on||!S.share.code)return;
-  const snap=snapshot(),json=JSON.stringify(snap),sig=json.replace(/"ts":\d+,/,'');
+  if(!S.share||!S.share.on)return;
+  const json=JSON.stringify(snapshot()),sig=json.replace(/"ts":\d+,/,'')+shareCode();
   if(!force&&sig===shSig)return;
-  try{shK=shK||await shareKeys(S.share.code);
-    const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},shK.key,new TextEncoder().encode(json)));
+  try{const k=await shareKeysFor();
+    const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k.key,new TextEncoder().encode(json)));
     const out=new Uint8Array(iv.length+ct.length);out.set(iv);out.set(ct,iv.length);
-    const r=await fetch(NTFY+shK.topic,{method:'POST',body:b64(out)});
+    const r=await fetch(NTFY+k.topic,{method:'POST',body:b64(out)});
     if(!r.ok)throw new Error('HTTP '+r.status);
     shSig=sig;shErr='';S.share.last=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   }catch(e){shErr='Küldési hiba: '+String(e&&(e.message||e)).slice(0,60)}
   renderShare()}
 function shareSoon(){clearTimeout(shT);shT=setTimeout(()=>shareSend(false),4000)}
-async function shareAlert(msg){if(!S.share||!S.share.on||!S.share.code)return;
-  try{shK=shK||await shareKeys(S.share.code);
-    await fetch(NTFY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:shK.topic+'-a',title:'Kortyi 💧',message:msg,tags:['droplet']})})}catch(e){}}
+async function shareAlert(msg){if(!S.share||!S.share.on)return;
+  try{const k=await shareKeysFor();
+    await fetch(NTFY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:k.topic+'-a',title:'Kortyi 💧',message:msg,tags:['droplet']})})}catch(e){}}
 function renderShare(){
   const on=!!(S.share&&S.share.on),t=S.share&&S.share.last?new Date(S.share.last).toTimeString().slice(0,5):'';
   $('#shStatus').innerHTML=on?'✅ Bekapcsolva'+(t?' · utolsó küldés: '+t:'')+(shErr?'<br><small>'+shErr+'</small>':''):'⛔ Ki van kapcsolva, a párod nem lát semmit.';
-  $('#shOn').textContent=on?'Kikapcsolás':'Bekapcsolás';$('#shLink').disabled=!on;$('#shNew').disabled=!on}
-async function shareLink(){
-  const url=UPDATE_BASE+'figyelo/#'+S.share.code,txt='Kortyi figyelő 👀💧 '+url,P=window.Capacitor&&window.Capacitor.Plugins;
-  try{if(P&&P.Share){await P.Share.share({title:'Kortyi figyelő',text:txt,dialogTitle:'Link küldése'});return}
-    if(navigator.share){await navigator.share({title:'Kortyi figyelő',text:txt});return}}
-  catch(e){if(/cancel|abort/i.test(String(e&&(e.message||e.name))))return}
-  try{await navigator.clipboard.writeText(url);toast('Link kimásolva 📋')}catch(e){await info('Link: '+url)}}
+  $('#shOn').textContent=on?'Kikapcsolás':'Bekapcsolás'}
 $('#shOn').onclick=async()=>{
   if(S.share.on){if(await ask('Kikapcsolod a megosztást? A párod nem kap több adatot.')){S.share.on=false;save();renderShare();toast('Megosztás kikapcsolva')}return}
-  const ok=await ask('👫 Megosztás a párommal\n\nA párod ezt látja élőben:\n• minden ivásod pontos időpontját, mennyiségét és italát\n• a napi állásodat, aranyadat, szériádat, szintedet\n• a heti szörnyet és az eseményeket\n\nAz adatok titkosítva mennek, csak a link birtokosa olvashatja. A célteljesítésről egyszerű értesítés is mehet. Bármikor kikapcsolhatod. Bekapcsolod?');
-  if(!ok)return;
-  S.share={on:true,code:b64u(crypto.getRandomValues(new Uint8Array(16))),last:0};shK=null;shSig='';save();await shareSend(true);renderShare();
-  if(await ask('Bekapcsolva! Elküldöd most a linket a párodnak?'))shareLink()};
-$('#shLink').onclick=()=>{if(S.share.on)shareLink()};
-$('#shNew').onclick=async()=>{if(!S.share.on)return;if(await ask('Új kódot generálsz? A régi link megszűnik, az újat el kell küldened.')){
-  S.share.code=b64u(crypto.getRandomValues(new Uint8Array(16)));shK=null;shSig='';save();await shareSend(true);toast('Új kód kész, küldd el a linket');shareLink()}};
+  S.share.on=true;shSig='';save();await shareSend(true);renderShare();toast('👫 Megosztás bekapcsolva')};
 
 /* ---- Emlékkönyv + statisztika ---- */
 function renderMemories(){
@@ -1052,6 +1042,8 @@ setTimeout(()=>checkUpdate(false),4000);
 setTimeout(loadRemote,2500);
 resolveMonsters();
 if(S.share.on)setTimeout(()=>shareSend(true),3500);
+if(!S.share.seen)setTimeout(function t(){if($('#dlg').classList.contains('on'))return setTimeout(t,2000);
+  S.share.seen=true;save();info('👫 A megosztás be van kapcsolva: a párod látja az ivásaidat (időponttal), az aranyadat, szériádat és a szörny állását.\n\nKikapcsolhatod a Beállítások → Megosztás résznél.')},3000);
 setInterval(()=>{try{render()}catch(e){}},300000);
 /* OTA után a régi oldal maradéka duplikátumként a végére kerülhet: töröljük */
 function dedupe(){const seen=new Set();[...document.body.children].forEach(el=>{const k=el.id?'#'+el.id:el.tagName==='SCRIPT'?'script':'';if(!k)return;if(seen.has(k))el.remove();else seen.add(k)})}

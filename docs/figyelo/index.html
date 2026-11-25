@@ -37,25 +37,20 @@ h2{font-size:1rem;margin:18px 0 8px}
 input{width:100%;padding:12px;border-radius:12px;border:0;font-size:1rem;background:rgba(0,0,0,.3);color:var(--txt);margin:10px 0}
 button{border:0;border-radius:14px;background:var(--water);color:#06314a;font-weight:800;padding:12px 16px;font-size:1rem;cursor:pointer}
 button.ghost{background:var(--card2);color:var(--txt)}
+button.ghost.on{background:var(--water);color:#06314a}
 code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:6px;font-size:.8rem;word-break:break-all}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
-<div id="login" class="card" hidden>
-  <h1>👀 Kortyi figyelő</h1>
-  <p class="sub">Illeszd be a linket vagy a kódot, amit Mónikától kaptál.</p>
-  <input id="codeIn" placeholder="Link vagy kód" autocomplete="off">
-  <button id="go">Megnézem</button>
-</div>
-
-<div id="app" hidden>
+<div id="app">
   <div class="top">
     <div><h1 id="who">…</h1><div class="sub"><span class="dot" id="dot"></span><span id="upd">Betöltés…</span></div></div>
-    <button class="ghost" id="forget" style="padding:8px 12px;font-size:.8rem">Kilépés</button>
+    
   </div>
 
+  <div style="display:flex;gap:8px;margin-top:12px"><button id="tabA" class="ghost" style="flex:1">👩 Felnőtt</button><button id="tabK" class="ghost" style="flex:1">🧒 Gyerek</button></div>
   <div class="card" style="margin-top:12px">
     <div class="sub">Ma</div>
     <div class="big"><span id="ml">0</span> <span style="font-size:1rem;color:var(--dim)">/ <span id="goal">0</span> ml</span></div>
@@ -98,13 +93,9 @@ const TYPES = {viz:['💧','Víz'],tea:['🍵','Tea'],shake:['💪','Shake (víz
 const $ = s => document.querySelector(s);
 const hex = u => [...u].map(x => x.toString(16).padStart(2, '0')).join('');
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-let code = '', topic = '', key = null, lastId = '', snap = null, timer = null;
+const CODES = {a: '08bRDKobLSGlCfGe5oTTIg', k: '9h0i3GMOl2CZ0t26s5IbqQ'};
+let chan = 'a', topic = '', key = null, lastId = '', snap = null, timer = null, renderT = null;
 
-function parseCode(v) {
-  v = (v || '').trim();
-  const i = v.indexOf('#'); if (i >= 0) v = v.slice(i + 1);
-  return v.replace(/^k=/, '').trim();
-}
 async function keys(c) {
   const e = new TextEncoder();
   const t = 'kortyi-' + hex(new Uint8Array(await crypto.subtle.digest('SHA-256', e.encode('t:' + c)))).slice(0, 32);
@@ -128,7 +119,7 @@ function ago(ts) {
 function esc(t) { return String(t).replace(/[<>&"]/g, c => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;'}[c])); }
 
 function render() {
-  if (!snap) return;
+  if (!snap) { $('#who').textContent = chan === 'k' ? 'Gyerek' : 'Felnőtt'; $('#upd').textContent = 'Még nincs adat ezen a csatornán'; $('#dot').className = 'dot'; $('#today').innerHTML = '<span class="sub">Még nem érkezett adat.</span>'; $('#events').innerHTML = ''; $('#days').innerHTML = ''; $('#alertTopic').textContent = topic + '-a'; return; }
   const d = snap, ml = d.d.reduce((a, x) => a + x[3], 0), p = Math.min(1, ml / d.g);
   $('#who').textContent = (d.n || 'Játékos') + ' · ' + (d.k || 'Kortyi');
   $('#ml').textContent = ml; $('#goal').textContent = d.g;
@@ -162,7 +153,7 @@ async function poll() {
       try {
         const s = await decrypt(msgs[i].message);
         snap = s; lastId = msgs[msgs.length - 1].id;
-        localStorage.setItem('kortyi.fig.snap', JSON.stringify(s));
+        localStorage.setItem('kortyi.fig.snap.' + chan, JSON.stringify(s));
         break;
       } catch (e) { /* nem a mi üzenetünk */ }
     }
@@ -171,20 +162,20 @@ async function poll() {
   render();
 }
 
-async function start(c) {
-  code = c; localStorage.setItem('kortyi.fig.code', c);
-  const kk = await keys(c); topic = kk.t; key = kk.k;
-  $('#login').hidden = true; $('#app').hidden = false;
-  try { snap = JSON.parse(localStorage.getItem('kortyi.fig.snap') || 'null'); } catch (e) { snap = null; }
+async function start(ch) {
+  chan = ch; localStorage.setItem('kortyi.fig.chan', ch);
+  const kk = await keys(CODES[ch]); topic = kk.t; key = kk.k; lastId = '';
+  $('#tabA').className = 'ghost' + (ch === 'a' ? ' on' : '');
+  $('#tabK').className = 'ghost' + (ch === 'k' ? ' on' : '');
+  try { snap = JSON.parse(localStorage.getItem('kortyi.fig.snap.' + ch) || 'null'); } catch (e) { snap = null; }
+  if (!snap) { $('#upd').textContent = 'Betöltés…'; $('#ml').textContent = '0'; }
   render(); await poll();
   clearInterval(timer); timer = setInterval(poll, 15000);
-  setInterval(render, 30000);
-  if (location.hash) history.replaceState(null, '', location.pathname);
+  clearInterval(renderT); renderT = setInterval(render, 30000);
 }
-$('#go').onclick = () => { const c = parseCode($('#codeIn').value); if (c.length >= 16) start(c); else $('#codeIn').focus(); };
-$('#forget').onclick = () => { localStorage.removeItem('kortyi.fig.code'); localStorage.removeItem('kortyi.fig.snap'); location.reload(); };
-const initial = parseCode(location.hash) || localStorage.getItem('kortyi.fig.code') || '';
-if (initial.length >= 16) start(initial); else $('#login').hidden = false;
+$('#tabA').onclick = () => start('a');
+$('#tabK').onclick = () => start('k');
+start(location.hash === '#gyerek' ? 'k' : (localStorage.getItem('kortyi.fig.chan') || 'a'));
 </script>
 </body>
 </html>
