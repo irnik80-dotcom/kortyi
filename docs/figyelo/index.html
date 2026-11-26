@@ -40,7 +40,15 @@ button.ghost{background:var(--card2);color:var(--txt)}
 button.ghost.on{background:var(--water);color:#06314a}
 code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:6px;font-size:.8rem;word-break:break-all}
 [hidden]{display:none!important}
+textarea{width:100%;min-height:70px;padding:12px;border-radius:12px;border:0;font-size:1rem;background:rgba(0,0,0,.3);color:var(--txt);margin:8px 0;font-family:inherit;resize:vertical}
+.q{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.q button{padding:8px 12px;font-size:.85rem;background:var(--card2);color:var(--txt);font-weight:600}
+a{color:var(--acc)}
+#map{height:260px;border-radius:12px;background:rgba(0,0,0,.25)}
+.chk{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--dim);margin:6px 0}
+.chk input{width:auto;margin:0}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 </head>
 <body>
 <main>
@@ -72,6 +80,11 @@ code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:6px;font-size:.8rem
     <div class="sub" id="mtxt" style="margin-top:8px"></div>
   </div>
 
+  <div id="mapWrap" hidden>
+    <h2>🗺️ Térkép</h2>
+    <div class="card"><div id="map"></div><div class="sub" id="mapLinks" style="margin-top:8px"></div></div>
+  </div>
+
   <h2>Mai ivások</h2>
   <div class="card" id="today"></div>
 
@@ -81,11 +94,22 @@ code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:6px;font-size:.8rem
   <h2>Események</h2>
   <div class="card" id="events"></div>
 
+  <h2>💌 Üzenet küldése</h2>
+  <div class="card">
+    <input id="from" placeholder="A neved (pl. Párod)" maxlength="20">
+    <div class="q" id="qmsg"></div>
+    <textarea id="msg" maxlength="120" placeholder="Írj neki valami kedveset…"></textarea>
+    <label class="chk"><input type="checkbox" id="push"> 📲 ntfy push is (nem titkosított, ha neki van ntfy appja)</label>
+    <button id="send">Küldés 💌</button>
+    <div class="sub" id="sent" style="margin-top:8px"></div>
+  </div>
+
   <h2>Értesítés a fontos eseményekről</h2>
   <div class="card sub">Ha telefonra szeretnél értesítést (például amikor eléri a napi célt), telepítsd az ingyenes <b>ntfy</b> appot, és iratkozz fel erre a témára:<br><code id="alertTopic"></code></div>
 </div>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 'use strict';
 const NTFY = 'https://ntfy.sh/';
@@ -100,7 +124,7 @@ async function keys(c) {
   const e = new TextEncoder();
   const t = 'kortyi-' + hex(new Uint8Array(await crypto.subtle.digest('SHA-256', e.encode('t:' + c)))).slice(0, 32);
   const base = await crypto.subtle.importKey('raw', e.encode(c), 'PBKDF2', false, ['deriveKey']);
-  const k = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: e.encode('kortyi-v1'), iterations: 50000, hash: 'SHA-256'}, base, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+  const k = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: e.encode('kortyi-v1'), iterations: 50000, hash: 'SHA-256'}, base, {name: 'AES-GCM', length: 256}, false, ['decrypt', 'encrypt']);
   return {t, k};
 }
 async function decrypt(b64) {
@@ -133,15 +157,38 @@ function render() {
   const list = [...d.d].sort((a, b) => b[0] - a[0]);
   $('#today').innerHTML = list.length ? list.map(x => {
     const t = TYPES[x[2]] || TYPES.viz;
-    return '<div class="row"><span>' + hm(x[0]) + '</span><span>' + t[0] + ' ' + x[1] + ' ml <small>' + esc(t[1]) + (x[3] !== x[1] ? ' → ' + x[3] + ' ml vízként' : '') + '</small></span></div>';
+    const loc = x.length >= 6 ? ' <a href="https://www.google.com/maps?q=' + x[4] + ',' + x[5] + '" target="_blank" rel="noopener">📍' + (x[6] ? ' ' + esc(x[6]) : '') + '</a>' : '';
+    return '<div class="row"><span>' + hm(x[0]) + '</span><span>' + t[0] + ' ' + x[1] + ' ml <small>' + esc(t[1]) + (x[3] !== x[1] ? ' → ' + x[3] + ' ml vízként' : '') + '</small>' + loc + '</span></div>';
   }).join('') : '<span class="sub">Ma még nem ivott.</span>';
   const mx = Math.max(d.g, ...d.days.map(x => x[0]));
   $('#days').innerHTML = d.days.map(x => '<div class="' + (x[1] ? 'ok' : '') + '" title="' + x[0] + ' ml" style="height:' + (x[0] / mx * 100) + '%"></div>').join('');
   $('#events').innerHTML = d.ev.length ? d.ev.map(e => '<div class="row"><span>' + esc(e[1]) + '</span><small>' + ago(e[0] * 1000) + '</small></div>').join('') : '<span class="sub">Még nincs esemény.</span>';
   $('#alertTopic').textContent = topic + '-a';
+  drawMap(d);
   const age = Date.now() - d.ts;
   $('#upd').textContent = 'Utolsó frissítés: ' + ago(d.ts);
   $('#dot').className = 'dot' + (age < 12 * 3600e3 ? ' on' : '');
+}
+
+let map = null, layer = null;
+function drawMap(d) {
+  const today = d.d.filter(x => x.length >= 6).map(x => ({lat: x[4], lon: x[5], t: hm(x[0]), ml: x[1], pn: x[6], now: true}));
+  const old = (d.m || []).map(x => ({lat: x[1], lon: x[2], t: new Date(x[0] * 1000).toLocaleString('hu-HU', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'}), ml: x[3], pn: x[4], now: false}));
+  const pts = [...old, ...today];
+  $('#mapWrap').hidden = !pts.length;
+  if (!pts.length) return;
+  const last = today.length ? today[today.length - 1] : pts[pts.length - 1];
+  $('#mapLinks').innerHTML = 'Legutóbbi hely: <a href="https://www.google.com/maps?q=' + last.lat + ',' + last.lon + '" target="_blank" rel="noopener">📍 Megnyitás Google Mapsben</a> · ' + (last.pn ? esc(last.pn) + ' · ' : '') + last.t + '<br><span style="font-size:.75rem">Kék: mai ivások, szürke: az előző 2 nap.</span>';
+  if (typeof L === 'undefined') return;
+  if (!map) {
+    map = L.map('map', {zoomControl: true, attributionControl: true});
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
+    layer = L.layerGroup().addTo(map);
+  }
+  layer.clearLayers();
+  pts.forEach(p => L.circleMarker([p.lat, p.lon], {radius: p.now ? 9 : 6, color: p.now ? '#0284c7' : '#94a3b8', fillColor: p.now ? '#38bdf8' : '#cbd5e1', fillOpacity: .85, weight: 2})
+    .bindPopup(p.t + ' · ' + p.ml + ' ml' + (p.pn ? ' · ' + p.pn : '')).addTo(layer));
+  map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), {padding: [24, 24], maxZoom: 16});
 }
 
 async function poll() {
@@ -173,6 +220,28 @@ async function start(ch) {
   clearInterval(timer); timer = setInterval(poll, 15000);
   clearInterval(renderT); renderT = setInterval(render, 30000);
 }
+const QMSG = ['Igyál egy kortyot! 😘', 'Büszke vagyok rád! 💙', 'Hiányzol 😍', 'Ma este kettesben vagyunk 🥂', 'Szuper vagy! Így tovább! 💪'];
+$('#qmsg').innerHTML = QMSG.map(t => '<button data-q="' + esc(t) + '">' + esc(t) + '</button>').join('');
+$('#qmsg').onclick = e => { const b = e.target.closest('button'); if (b) { $('#msg').value = b.dataset.q; $('#msg').focus(); } };
+$('#from').value = localStorage.getItem('kortyi.fig.from') || '';
+async function sendMsg() {
+  const t = $('#msg').value.trim(), f = ($('#from').value || 'Párod').trim().slice(0, 20);
+  if (!t) { $('#msg').focus(); return; }
+  localStorage.setItem('kortyi.fig.from', $('#from').value.trim());
+  $('#send').disabled = true;
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv}, key, new TextEncoder().encode(JSON.stringify({f, t, ts: Date.now()}))));
+    const out = new Uint8Array(iv.length + ct.length); out.set(iv); out.set(ct, iv.length);
+    let bin = ''; out.forEach(c => bin += String.fromCharCode(c));
+    const r = await fetch(NTFY + topic + '-m', {method: 'POST', body: btoa(bin)});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if ($('#push').checked) await fetch(NTFY, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({topic: topic + '-p', title: 'Kortyi 💌', message: f + ': ' + t, tags: ['love_letter']})});
+    $('#msg').value = ''; $('#sent').textContent = 'Elküldve ✔ ' + new Date().toTimeString().slice(0, 5) + ' (az app megnyitásakor vagy 45 mp-en belül megérkezik)';
+  } catch (e) { $('#sent').textContent = 'Nem sikerült elküldeni: ' + e.message; }
+  $('#send').disabled = false;
+}
+$('#send').onclick = sendMsg;
 $('#tabA').onclick = () => start('a');
 $('#tabK').onclick = () => start('k');
 start(location.hash === '#gyerek' ? 'k' : (localStorage.getItem('kortyi.fig.chan') || 'a'));

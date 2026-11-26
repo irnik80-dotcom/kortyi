@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=17;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=18;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -194,6 +194,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
 <!-- JELVÉNYEK -->
 <section class="view" id="v-badges">
   <h2>🏅 Jelvények</h2><div class="badges" id="badges"></div>
+  <h2>💌 Üzenetek</h2><div class="card" id="inbox"></div>
   <h2>📖 Emlékkönyv</h2><div class="card" id="memories"></div>
   <h2>📊 Statisztika</h2><div class="card" id="stats"></div>
 </section>
@@ -205,6 +206,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
   <h2>📅 Naptár</h2><div style="margin-bottom:8px"><button class="btn" id="monthImg" style="width:100%">📸 Havi összefoglaló kép</button></div><div class="card"><div class="calHead"><button id="calPrev">◀</button><b id="calTitle"></b><button id="calNext">▶</button></div><div class="cal" id="cal"></div></div>
   <h2>⏰ Mikor iszol?</h2><div class="card"><div class="hours" id="hours"></div><div class="hl"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div><div id="hoursTxt" style="margin-top:8px"></div></div>
   <h2>📊 Heti átlag (8 hét)</h2><div class="card"><div class="week" id="weeks"></div></div>
+  <h2>📍 Hol iszol?</h2><div class="card" id="placeStats"></div>
   <h2>🏆 Rekordok</h2><div class="card" id="records"></div>
 </section>
 <!-- BEÁLLÍTÁS -->
@@ -220,6 +222,9 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
     <label class="f">Lefekvés (óra)<input type="number" id="sTo" min="1" max="23"></label>
     <div class="row"><button class="btn pri" id="sSave">Mentés</button></div>
   </div>
+  <div class="card"><label class="f">📍 Hely mentése ivásnál<select id="sLoc"><option value="1">Be</option><option value="0">Ki</option></select></label>
+    <div id="placeList"></div>
+    <small style="color:var(--dim);display:block;margin-top:4px">Csak a rögzítés pillanatában kéri le a pontos helyet, háttérben nem követ. A párod a Figyelő oldalon térképen látja. A gyakori helyeket elnevezheted (Otthon, Munka…).</small></div>
   <div class="card"><b>👫 Megosztás a párommal</b>
     <div id="shStatus" style="margin:8px 0;font-size:.9rem;color:var(--dim)"></div>
     <div class="row"><button class="btn" id="shOn">Kikapcsolás</button></div>
@@ -294,7 +299,7 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
   return {}}
 function fix(){const D={goal:2150,monsterRes:{},trophies:[],monsterFrom:'',weight:65,height:163,act:33,chestMsgs:[],xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
-  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:true,last:0,v:17,seen:false}};
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:true,last:0,v:17,seen:false},loc:{on:true,asked:false},places:[],locAsked:{},inbox:[],msgSince:''};
   for(const k in D)if(S[k]===undefined)S[k]=D[k];
   if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}
   if(!S.share||S.share.v!==17)S.share={on:true,last:0,v:17,seen:false}}
@@ -421,6 +426,7 @@ function drink(raw,type=curType,when){
   if(T.bubbly&&!S.kid&&S.bubblyOn&&now.getDay()===5&&now.getHours()>=20&&arr.filter(l=>l.bq).length<2)e.bq=1;
   if(q){const credited=Math.max(0,Math.min(ml,S.goal-before));e.c=Math.round(DRINK_CAP*credited/S.goal);e.x=Math.round(ml/10)}
   arr.push(e);arr.sort((a,b)=>a.t-b.t);S.coins+=e.c;
+  if(!when)capturePos(e);
   if(!when){drinkSound();monHit=true;setTimeout(()=>{monHit=false;try{renderMonster()}catch(x){}},700)}
   if(q)addXp(e.x);
   if(T.bubbly)toast(e.bq?'🥂 Egészségedre! Beírva, a bónuszhoz a napi cél 80%-a kell.':'🥂 Beírva (vízként nem számít)');
@@ -693,14 +699,15 @@ const hex=u=>[...u].map(x=>x.toString(16).padStart(2,'0')).join('');
 async function shareKeys(code){const e=new TextEncoder();
   const topic='kortyi-'+hex(new Uint8Array(await crypto.subtle.digest('SHA-256',e.encode('t:'+code)))).slice(0,32);
   const base=await crypto.subtle.importKey('raw',e.encode(code),'PBKDF2',false,['deriveKey']);
-  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('kortyi-v1'),iterations:50000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:e.encode('kortyi-v1'),iterations:50000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
   return {topic,key,code}}
 async function shareKeysFor(){const c=shareCode();if(!shK||shK.code!==c)shK=await shareKeys(c);return shK}
 function addEvent(t){try{S.events.unshift([Date.now(),t]);S.events=S.events.slice(0,12)}catch(e){}}
 function snapshot(){const t=today(),cur=weekKey(t),m=monsterFor(cur),mid=new Date(t.replace(/-/g,'/')).getTime();
   return {v:1,ts:Date.now(),n:S.player,k:S.name,g:S.goal,c:S.coins,st:streak(),lv:level(S.xp),tr:S.trophies.length,kid:S.kid?1:0,
     mo:{n:m.n,e:m.e,p:Math.round(Math.min(1,weekSum(cur)/(MON_NEED*S.goal))*100),w:S.monsterRes[cur]==='win'?1:0},wk:weekDone(),
-    d:logs(t).map(l=>[Math.round((l.t-mid)/60000),l.raw||l.ml,l.type||'viz',l.ml]),
+    d:logs(t).map(l=>[Math.round((l.t-mid)/60000),l.raw||l.ml,l.type||'viz',l.ml].concat(l.p?[l.p[0],l.p[1],l.pn||'']:[])),
+    m:[1,2].flatMap(i=>logs(addDays(t,-i)).filter(l=>l.p).map(l=>[Math.round(l.t/1000),l.p[0],l.p[1],l.ml,l.pn||''])).slice(0,20),
     days:[...Array(14)].map((_,i)=>{const k=addDays(t,i-13);return [sum(k),S.goalDays[k]?1:0]}),
     ev:S.events.slice(0,10).map(e=>[Math.round(e[0]/1000),e[1]])}}
 async function shareSend(force){
@@ -726,6 +733,60 @@ function renderShare(){
 $('#shOn').onclick=async()=>{
   if(S.share.on){if(await ask('Kikapcsolod a megosztást? A párod nem kap több adatot.')){S.share.on=false;save();renderShare();toast('Megosztás kikapcsolva')}return}
   S.share.on=true;shSig='';save();await shareSend(true);renderShare();toast('👫 Megosztás bekapcsolva')};
+
+/* ---- Hely ivásnál ---- */
+const dist=(a,b)=>{const dx=(a[1]-b[1])*111320*Math.cos(a[0]*Math.PI/180),dy=(a[0]-b[0])*110540;return Math.sqrt(dx*dx+dy*dy)};
+const nearPlace=p=>S.places.find(z=>dist(p,[z.lat,z.lon])<150);
+const placeEmoji=n=>{n=n.toLowerCase();return /otthon|lakás|home/.test(n)?'🏠':/munka|iroda|suli|iskola/.test(n)?'💼':/edz|kondi|gym|fitnesz/.test(n)?'🏋️':/étterem|kávéz|cukrász|bár/.test(n)?'🍽️':'📍'};
+async function capturePos(e){
+  if(!S.loc||!S.loc.on)return;
+  const G=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
+  try{
+    if(!S.loc.asked){S.loc.asked=true;save();await info('📍 Az app ivásnál elmenti a pontos helyedet, csak abban a pillanatban, háttérben nem követ. A párod a Figyelő oldalon térképen látja.\n\nKikapcsolhatod a Beállításokban.')}
+    let pos;
+    if(G){let st=(await G.checkPermissions()).location;
+      if(st!=='granted')st=(await G.requestPermissions({permissions:['location']})).location;
+      if(st!=='granted'){S.loc.on=false;save();render();toast('📍 Hely-engedély nélkül nem mentem a helyet (Telefon Beállítások → Kortyi → Engedélyek → Hely)');return}
+      pos=await G.getCurrentPosition({enableHighAccuracy:true,timeout:12000,maximumAge:20000})}
+    else if(navigator.geolocation){pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:12000,maximumAge:20000}))}
+    else return;
+    const c=pos.coords;e.p=[+c.latitude.toFixed(5),+c.longitude.toFixed(5)];e.acc=Math.round(c.accuracy||0);
+    const pl=nearPlace(e.p);if(pl)e.pn=pl.n;
+    save();render();if(!pl)maybeNamePlace(e)
+  }catch(err){}}
+async function maybeNamePlace(e){
+  const key=e.p.map(x=>x.toFixed(3)).join(',');if(S.locAsked[key])return;
+  const near=Object.values(S.days).flat().filter(l=>l.p&&!l.pn&&dist(l.p,e.p)<120);if(near.length<3)return;
+  S.locAsked[key]=1;save();
+  const n=await ask('📍 Itt már többször ittál. Hogy hívjuk ezt a helyet? (pl. Otthon, Munka, Edzőterem)',{input:1,def:''});
+  if(n&&n.trim()){const name=n.trim().slice(0,20);S.places.push({n:name,e:placeEmoji(name),lat:e.p[0],lon:e.p[1]});
+    Object.values(S.days).flat().forEach(l=>{if(l.p&&!l.pn&&dist(l.p,e.p)<150)l.pn=name});save();render();toast('📍 Hely elmentve: '+name)}}
+function renderPlaces(){
+  $('#placeList').innerHTML=S.places.length?S.places.map((z,i)=>`<div class="item"><span class="e">${z.e}</span><div class="n" style="font-weight:600">${z.n.replace(/[<>&]/g,'')}</div><button class="del" data-pd="${i}">✕</button></div>`).join(''):'<small style="color:var(--dim)">Még nincs elnevezett hely. Ha többször iszol ugyanott, megkérdezi a nevét.</small>'}
+$('#placeList').onclick=e=>{const d=e.target.closest('[data-pd]');if(d){S.places.splice(+d.dataset.pd,1);save();renderPlaces()}};
+$('#sLoc').onchange=()=>{S.loc.on=$('#sLoc').value==='1';save()};
+function renderPlaceStats(){
+  const all=Object.values(S.days).flat().filter(l=>l.p),g={};
+  all.forEach(l=>{const k=l.pn||'Ismeretlen hely';g[k]=g[k]||{n:0,ml:0};g[k].n++;g[k].ml+=l.ml});
+  const rows=Object.entries(g).sort((a,b)=>b[1].ml-a[1].ml),mx=Math.max(1,...rows.map(r=>r[1].ml));
+  $('#placeStats').innerHTML=rows.length?rows.map(([k,v])=>{const z=S.places.find(x=>x.n===k);return `<div class="log"><span>${z?z.e:'📍'} ${k.replace(/[<>&]/g,'')}</span><b>${v.n}× · ${v.ml} ml</b></div><div class="bar"><i style="width:${v.ml/mx*100}%;background:var(--water)"></i></div>`}).join(''):'<span style="color:var(--dim)">Még nincs helyadat. Az új ivásoknál az app elmenti, hol vagy.</span>'}
+
+/* ---- Bejövő üzenetek a párodtól ---- */
+async function msgDecrypt(k,b){const raw=Uint8Array.from(atob(b.trim()),c=>c.charCodeAt(0)),pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},k.key,raw.slice(12));return JSON.parse(new TextDecoder().decode(pt))}
+let inboxBusy=false;
+async function inboxPoll(){
+  if(inboxBusy)return;inboxBusy=true;
+  try{const k=await shareKeysFor();
+    const txt=await (await fetch(NTFY+k.topic+'-m/json?poll=1&since='+(S.msgSince||'all'),{cache:'no-store'})).text();
+    const msgs=txt.split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(m=>m&&m.event==='message');
+    const fresh=[];
+    for(const m of msgs){try{const o=await msgDecrypt(k,m.message);if(!S.inbox.some(x=>x.id===m.id))fresh.push({id:m.id,ts:(m.time||0)*1000,from:String(o.f||'Párod').slice(0,20),text:String(o.t||'').slice(0,160)})}catch(e){}}
+    if(msgs.length)S.msgSince=msgs[msgs.length-1].id;
+    if(fresh.length){fresh.forEach(f=>S.inbox.unshift(f));S.inbox=S.inbox.slice(0,40);save();render();play('chest');try{navigator.vibrate&&navigator.vibrate([80,60,80])}catch(e){}
+      for(const f of fresh){while($('#dlg').classList.contains('on'))await new Promise(r=>setTimeout(r,1500));await info('💌 '+f.from+':\n'+f.text)}}
+  }catch(e){}
+  inboxBusy=false}
+function renderInbox(){$('#inbox').innerHTML=S.inbox.length?S.inbox.map(m=>`<div class="mem"><span class="e">💌</span><div><b>${m.text.replace(/[<>&]/g,'')}</b><small>${m.from.replace(/[<>&]/g,'')} · ${new Date(m.ts).toLocaleString('hu-HU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></div>`).join(''):'<span style="color:var(--dim)">Itt jelennek meg a párodtól érkezett üzenetek. 💙</span>'}
 
 /* ---- Emlékkönyv + statisztika ---- */
 function renderMemories(){
@@ -888,7 +949,7 @@ function render(){
   if(mode==='sleep')$('#mood').textContent='Zzz… a kabala alszik 😴 (reggel iszunk!)';
   else if(mode==='yawn')$('#mood').textContent='Hááám… jó reggelt! 🥱 Igyál egy pohár vizet ébredésre!';
   else if(mode==='sleepy')$('#mood').textContent='Ebéd utáni bágyadtság… egy pohár víz segít! 😪';
-  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderBubbly();renderMonster();renderTypes();renderShare();S.best=Math.max(S.best,streak());renderShop();
+  mascot(p,dry,mode);renderWard();renderMemories();renderStats();renderSeason();renderBubbly();renderMonster();renderTypes();renderShare();renderInbox();renderPlaceStats();renderPlaces();S.best=Math.max(S.best,streak());renderShop();
   $('#weekly').innerHTML=`🏆 Heti kihívás: <b>${Math.min(WEEK_NEED,weekDone())}/${WEEK_NEED}</b> teljesített nap = ${WEEK_COINS} arany<div class="bar"><i style="width:${Math.min(1,weekDone()/WEEK_NEED)*100}%;background:linear-gradient(90deg,#4ade80,#16a34a)"></i></div><small style="color:var(--dim)">Arany: napi max. ${DRINK_CAP} ivásból, ${GOAL_COINS} a célért. Két ivás között 20 perc kell.</small>`;
   $('#lvlName').textContent=levelName(L);
   const a=needFor(L),b=needFor(L+1);
@@ -941,7 +1002,7 @@ $('#undo').onclick=()=>{const a=logs();if(!a.length)return;const l=a.pop();S.xp=
 $$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.toggle('on',x===b));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('main').scrollTop=0});
 $('#chk').onclick=()=>checkUpdate(true);
 $$('nav button').forEach(b=>{if(b.dataset.v==='set')b.addEventListener('click',()=>notifStatus(false))});
-function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sSound').value=S.sound?'1':'0';renderSounds();renderCm();$('#gW').value=S.weight;$('#gH').value=S.height;$('#gA').value=String(S.act);goalCalc();$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sQF').value=S.qFrom;$('#sQT').value=S.qTo;$('#sKid').value=S.kid?'1':'0';$('#sBub').value=S.bubblyOn?'1':'0';$('#sPlayer').value=S.player}
+function fillSet(){$('#ver').textContent='Verzió: v'+APP_V;$('#sSound').value=S.sound?'1':'0';renderSounds();renderCm();$('#gW').value=S.weight;$('#gH').value=S.height;$('#gA').value=String(S.act);goalCalc();$('#sGoal').value=S.goal;$('#sRem').value=S.rem;$('#sFrom').value=S.from;$('#sTo').value=S.to;$('#sQF').value=S.qFrom;$('#sQT').value=S.qTo;$('#sKid').value=S.kid?'1':'0';$('#sLoc').value=S.loc.on?'1':'0';$('#sBub').value=S.bubblyOn?'1':'0';$('#sPlayer').value=S.player}
 $('#sSave').onclick=()=>{S.goal=Math.min(6000,Math.max(500,+$('#sGoal').value||2000));S.rem=+$('#sRem').value;S.from=+$('#sFrom').value;S.to=+$('#sTo').value;S.qFrom=+$('#sQF').value||0;S.qTo=+$('#sQT').value||0;S.player=$('#sPlayer').value.trim()||'Mónika';save();render();scheduleReminders();toast('Mentve ✔')};
 $('#reset').onclick=async()=>{if(await ask('Biztosan törlöd az összes adatot?')){localStorage.removeItem(KEY);S=load();fix();fillSet();render();scheduleReminders()}};
 
@@ -1042,6 +1103,7 @@ setTimeout(()=>checkUpdate(false),4000);
 setTimeout(loadRemote,2500);
 resolveMonsters();
 if(S.share.on)setTimeout(()=>shareSend(true),3500);
+setTimeout(inboxPoll,5000);setInterval(()=>{if(!document.hidden)inboxPoll()},45000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)inboxPoll()});
 if(!S.share.seen)setTimeout(function t(){if($('#dlg').classList.contains('on'))return setTimeout(t,2000);
   S.share.seen=true;save();info('👫 A megosztás be van kapcsolva: a párod látja az ivásaidat (időponttal), az aranyadat, szériádat és a szörny állását.\n\nKikapcsolhatod a Beállítások → Megosztás résznél.')},3000);
 setInterval(()=>{try{render()}catch(e){}},300000);
