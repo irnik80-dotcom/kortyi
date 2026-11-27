@@ -59,6 +59,7 @@ a{color:var(--acc)}
   </div>
 
   <div style="display:flex;gap:8px;margin-top:12px"><button id="tabA" class="ghost" style="flex:1">👩 Felnőtt</button><button id="tabK" class="ghost" style="flex:1">🧒 Gyerek</button></div>
+  <div id="devs" class="q" hidden></div>
   <div class="card" style="margin-top:12px">
     <div class="sub">Ma</div>
     <div class="big"><span id="ml">0</span> <span style="font-size:1rem;color:var(--dim)">/ <span id="goal">0</span> ml</span></div>
@@ -118,7 +119,7 @@ const $ = s => document.querySelector(s);
 const hex = u => [...u].map(x => x.toString(16).padStart(2, '0')).join('');
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const CODES = {a: '08bRDKobLSGlCfGe5oTTIg', k: '9h0i3GMOl2CZ0t26s5IbqQ'};
-let chan = 'a', topic = '', key = null, lastId = '', snap = null, timer = null, renderT = null;
+let chan = 'a', topic = '', key = null, lastId = '', snap = null, timer = null, renderT = null, devs = {}, sel = '';
 
 async function keys(c) {
   const e = new TextEncoder();
@@ -191,22 +192,36 @@ function drawMap(d) {
   map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), {padding: [24, 24], maxZoom: 16});
 }
 
+const devKey = s => s.dv || ('régi' + ((s.lv > 1 || s.c > 0) ? '+' : '0'));
+const score = s => ((s.d.length || s.lv > 1 || s.c > 0) ? 1e15 : 0) + s.ts;
+function pickDev() {
+  const ids = Object.keys(devs);
+  if (!ids.length) { snap = null; sel = ''; return; }
+  const saved = localStorage.getItem('kortyi.fig.dev.' + chan);
+  sel = (saved && devs[saved]) ? saved : ids.sort((a, b) => score(devs[b]) - score(devs[a]))[0];
+  snap = devs[sel];
+  const box = $('#devs');
+  box.hidden = ids.length < 2;
+  box.innerHTML = ids.sort((a, b) => score(devs[b]) - score(devs[a])).map(id => {
+    const d = devs[id];
+    return '<button data-dv="' + esc(id) + '" class="' + (id === sel ? 'on' : '') + '">' + esc(d.n || 'Játékos') + ' · Sz.' + d.lv + ' · ' + ago(d.ts) + '</button>';
+  }).join('');
+}
+$('#devs').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  localStorage.setItem('kortyi.fig.dev.' + chan, b.dataset.dv); pickDev(); render();
+};
 async function poll() {
   try {
     const url = NTFY + topic + '/json?poll=1&since=' + (lastId || 'all');
     const txt = await (await fetch(url, {cache: 'no-store'})).text();
     const msgs = txt.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(m => m && m.event === 'message');
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      try {
-        const s = await decrypt(msgs[i].message);
-        snap = s; lastId = msgs[msgs.length - 1].id;
-        localStorage.setItem('kortyi.fig.snap.' + chan, JSON.stringify(s));
-        break;
-      } catch (e) { /* nem a mi üzenetünk */ }
+    for (const m of msgs) {
+      try { const s = await decrypt(m.message); const k = devKey(s); if (!devs[k] || s.ts >= devs[k].ts) devs[k] = s; } catch (e) { /* nem a mi üzenetünk */ }
     }
-    if (msgs.length) lastId = msgs[msgs.length - 1].id;
+    if (msgs.length) { lastId = msgs[msgs.length - 1].id; localStorage.setItem('kortyi.fig.devs.' + chan, JSON.stringify(devs)); }
   } catch (e) { /* nincs net: marad a legutóbbi állás */ }
-  render();
+  pickDev(); render();
 }
 
 async function start(ch) {
@@ -214,7 +229,8 @@ async function start(ch) {
   const kk = await keys(CODES[ch]); topic = kk.t; key = kk.k; lastId = '';
   $('#tabA').className = 'ghost' + (ch === 'a' ? ' on' : '');
   $('#tabK').className = 'ghost' + (ch === 'k' ? ' on' : '');
-  try { snap = JSON.parse(localStorage.getItem('kortyi.fig.snap.' + ch) || 'null'); } catch (e) { snap = null; }
+  try { devs = JSON.parse(localStorage.getItem('kortyi.fig.devs.' + ch) || '{}'); } catch (e) { devs = {}; }
+  pickDev();
   if (!snap) { $('#upd').textContent = 'Betöltés…'; $('#ml').textContent = '0'; }
   render(); await poll();
   clearInterval(timer); timer = setInterval(poll, 15000);

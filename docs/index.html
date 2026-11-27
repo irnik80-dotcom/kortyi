@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=18;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=19;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -299,10 +299,11 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return s}catch(e){}
   return {}}
 function fix(){const D={goal:2150,monsterRes:{},trophies:[],monsterFrom:'',weight:65,height:163,act:33,chestMsgs:[],xp:0,coins:0,days:{},claimed:{},badges:{},rem:2,from:8,to:21,goalDays:{},owned:[],custom:[],goalPaid:{},weekly:{},best:0,
-  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:true,last:0,v:17,seen:false},loc:{on:true,asked:false},places:[],locAsked:{},inbox:[],msgSince:''};
+  name:'Kortyi',player:'Mónika',skin:'blue',hat:'',own:{},freezes:0,frozen:{},fzDone:'',chest:'',tod:{},customCount:0,sound:true,kid:false,qFrom:0,qTo:0,bubblyOn:true,events:[],share:{on:true,last:0,v:17,seen:false},loc:{on:true,asked:false},dev:'',places:[],locAsked:{},inbox:[],msgSince:''};
   for(const k in D)if(S[k]===undefined)S[k]=D[k];
   if(!S.monsterFrom){const t=today(),w=weekKey(t);S.monsterFrom=t===w?w:addDays(w,7)}
-  if(!S.share||S.share.v!==17)S.share={on:true,last:0,v:17,seen:false}}
+  if(!S.share||S.share.v!==17)S.share={on:true,last:0,v:17,seen:false};
+  if(!S.dev)S.dev=Math.random().toString(36).slice(2,8)}
 fix();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   if(S.share&&S.share.on&&typeof shareSoon==='function')shareSoon()}
@@ -704,7 +705,7 @@ async function shareKeys(code){const e=new TextEncoder();
 async function shareKeysFor(){const c=shareCode();if(!shK||shK.code!==c)shK=await shareKeys(c);return shK}
 function addEvent(t){try{S.events.unshift([Date.now(),t]);S.events=S.events.slice(0,12)}catch(e){}}
 function snapshot(){const t=today(),cur=weekKey(t),m=monsterFor(cur),mid=new Date(t.replace(/-/g,'/')).getTime();
-  return {v:1,ts:Date.now(),n:S.player,k:S.name,g:S.goal,c:S.coins,st:streak(),lv:level(S.xp),tr:S.trophies.length,kid:S.kid?1:0,
+  return {v:1,dv:S.dev,ts:Date.now(),n:S.player,k:S.name,g:S.goal,c:S.coins,st:streak(),lv:level(S.xp),tr:S.trophies.length,kid:S.kid?1:0,
     mo:{n:m.n,e:m.e,p:Math.round(Math.min(1,weekSum(cur)/(MON_NEED*S.goal))*100),w:S.monsterRes[cur]==='win'?1:0},wk:weekDone(),
     d:logs(t).map(l=>[Math.round((l.t-mid)/60000),l.raw||l.ml,l.type||'viz',l.ml].concat(l.p?[l.p[0],l.p[1],l.pn||'']:[])),
     m:[1,2].flatMap(i=>logs(addDays(t,-i)).filter(l=>l.p).map(l=>[Math.round(l.t/1000),l.p[0],l.p[1],l.ml,l.pn||''])).slice(0,20),
