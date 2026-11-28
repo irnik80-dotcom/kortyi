@@ -114,7 +114,7 @@ a{color:var(--acc)}
 <script>
 'use strict';
 const NTFY = 'https://ntfy.sh/';
-const TYPES = {viz:['💧','Víz'],tea:['🍵','Tea'],shake:['💪','Shake (vízzel)'],kave:['☕','Kávé'],kakao:['🥛','Kakaó / tej'],shakeT:['🥤','Shake (tejjel)'],udito:['🧃','Üdítő'],pezsgo:['🥂','Pezsgő / Prosecco']};
+const TYPES = {viz:['💧','Víz'],tea:['🍵','Tea'],tej:['🥛','Tej'],kakao:['🍫','Kakaó'],shake:['💪','Shake (vízzel)'],shakeT:['🥤','Shake (tejjel)'],kave:['☕','Kávé'],udito:['🧃','Üdítő'],pezsgo:['🥂','Pezsgő / Prosecco']};
 const $ = s => document.querySelector(s);
 const hex = u => [...u].map(x => x.toString(16).padStart(2, '0')).join('');
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));

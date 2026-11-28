@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b3d5c">
 <script>
 /* KORTYI_APP OTA-betöltő: ha a telefonon van letöltött újabb verzió, azt indítja */
-(function(){var V=19;window.APP_V=V;if(window.__kortyiOta)return;
+(function(){var V=20;window.APP_V=V;if(window.__kortyiOta)return;
  try{var u=JSON.parse(localStorage.getItem('kortyi.update')||'null'),b=localStorage.getItem('kortyi.boot');
   if(b==='try'){localStorage.removeItem('kortyi.update');localStorage.setItem('kortyi.boot','')}
   else if(u&&u.v>V&&u.html){localStorage.setItem('kortyi.boot','try');window.__kortyiOta=1;document.open();document.write(u.html);document.close()}
@@ -415,7 +415,7 @@ const levelName=L=>'Sz.'+L+' · '+NAMES[Math.min(NAMES.length-1,Math.floor((L-1)
 const BUB_NEED=.8,BUB_COINS=25,COOLDOWN=20*60000,DRINK_CAP=15,GOAL_COINS=15,WEEK_NEED=5,WEEK_COINS=60;
 function weekKey(k){const [y,m,d]=k.split('-').map(Number);const dt=new Date(y,m-1,d);return dkey(new Date(y,m-1,d-((dt.getDay()+6)%7)))}
 const weekDone=(d=today())=>{const w=weekKey(d);return Object.keys(S.goalDays).filter(k=>weekKey(k)===w).length};
-const TYPES={viz:{e:'💧',n:'Víz',f:1,water:1},tea:{e:'🍵',n:'Tea',f:.95,water:1},shake:{e:'💪',n:'Shake (vízzel)',f:.95,water:1},kave:{e:'☕',n:'Kávé',f:.9,water:1},kakao:{e:'🥛',n:'Kakaó / tej',f:.5},shakeT:{e:'🥤',n:'Shake (tejjel)',f:.5},udito:{e:'🧃',n:'Üdítő',f:.3},pezsgo:{e:'🥂',n:'Pezsgő / Prosecco',f:0,bubbly:1}};
+const TYPES={viz:{e:'💧',n:'Víz',f:1,water:1},tea:{e:'🍵',n:'Tea',f:1,water:1},tej:{e:'🥛',n:'Tej',f:1,water:1},kakao:{e:'🍫',n:'Kakaó',f:1,water:1},shake:{e:'💪',n:'Shake (vízzel)',f:.95,water:1},shakeT:{e:'🥤',n:'Shake (tejjel)',f:.95,water:1},kave:{e:'☕',n:'Kávé',f:.8},udito:{e:'🧃',n:'Üdítő',f:.7},pezsgo:{e:'🥂',n:'Pezsgő / Prosecco',f:0,bubbly:1}};
 let curType='viz';
 function drink(raw,type=curType,when){
   if(!(raw>0)||raw>1000){toast('Egyszerre legfeljebb 1000 ml');return}
